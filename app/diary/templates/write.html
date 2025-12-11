@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>일기 작성 - Overmind</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        .btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        .chat-container {
+            flex: 1;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.ai {
+            justify-content: flex-start;
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+        .message.ai .message-bubble {
+            background: #667eea;
+            color: white;
+            border-bottom-left-radius: 4px;
+        }
+        .message.user .message-bubble {
+            background: #e5e5ea;
+            color: #333;
+            border-bottom-right-radius: 4px;
+        }
+        .message-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+            padding: 0 8px;
+        }
+        .input-area {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 10px;
+        }
+        #messageInput {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 10px 16px;
+            font-size: 14px;
+            outline: none;
+        }
+        #messageInput:focus {
+            border-color: #667eea;
+        }
+        #sendBtn {
+            padding: 10px 24px;
+            border-radius: 20px;
+        }
+        #finishBtn {
+            padding: 10px 24px;
+            border-radius: 20px;
+            background: #27ae60;
+        }
+        #finishBtn:hover {
+            background: #229954;
+        }
+        .typing-indicator {
+            display: none;
+            padding: 12px 16px;
+            background: #667eea;
+            color: white;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            max-width: 70px;
+        }
+        .typing-indicator.active {
+            display: inline-block;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: white;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .modal-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .option-btn {
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        .option-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .option-btn strong {
+            display: block;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .option-btn small {
+            color: #666;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>💬 오늘의 이야기를 들려주세요</h1>
+            <a href="/diary/" class="btn btn-secondary">일기장으로</a>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div class="messages-area" id="messagesArea">
+            <!-- Messages will be added here -->
+        </div>
+
+        <div class="input-area">
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="메시지를 입력하세요..."
+                autocomplete="off"
+            />
+            <button id="sendBtn" class="btn">전송</button>
+            <button id="finishBtn" class="btn">일기 생성</button>
+        </div>
+    </div>
+
+    <!-- 일기 생성 옵션 모달 -->
+    <div class="modal" id="diaryModal">
+        <div class="modal-content">
+            <h2>일기 분량을 선택해주세요</h2>
+            <div class="modal-options">
+                <button class="option-btn" onclick="generateDiary('summary')">
+                    <strong>📝 요약본</strong>
+                    <small>5~10줄 정도의 간단한 일기</small>
+                </button>
+                <button class="option-btn" onclick="generateDiary('normal')">
+                    <strong>📖 일반</strong>
+                    <small>20~30줄 정도의 일반적인 일기</small>
+                </button>
+                <button class="option-btn" onclick="generateDiary('detailed')">
+                    <strong>📚 상세본</strong>
+                    <small>50줄 이상의 자세한 일기</small>
+                </button>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+
+        // Check if logged in
+        if (!token) {
+            window.location.href = '/auth/login';
+        }
+
+        // Helper function to convert Date to local YYYY-MM-DD string
+        function toLocalISODate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Get entry date from URL parameter or use today
+        const urlParams = new URLSearchParams(window.location.search);
+        const entryDate = urlParams.get('date') || toLocalISODate(new Date());
+
+        let conversationId = null;
+        const messagesArea = document.getElementById('messagesArea');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const finishBtn = document.getElementById('finishBtn');
+
+        // Start conversation on page load
+        async function startConversation() {
+            try {
+                // 먼저 해당 날짜의 활성 대화가 있는지 확인
+                const checkRes = await fetch(`/diary/api/conversations/active?entry_date=${entryDate}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                let data;
+                if (checkRes.ok) {
+                    // 기존 활성 대화가 있으면 사용
+                    data = await checkRes.json();
+                    conversationId = data.id;
+
+                    // 기존 메시지 표시
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            addMessage(msg.role, msg.content);
+                        });
+                    }
+                } else {
+                    // 새 대화 시작
+                    const res = await fetch('/diary/api/conversations', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            entry_date: entryDate,
+                            initial_message: '안녕하세요! 오늘 하루 어떠셨어요? 편하게 이야기해주세요 😊'
+                        })
+                    });
+
+                    if (res.ok) {
+                        data = await res.json();
+                        conversationId = data.id;
+
+                        // 첫 AI 메시지 표시
+                        if (data.messages && data.messages.length > 0) {
+                            data.messages.forEach(msg => {
+                                addMessage(msg.role, msg.content);
+                            });
+                        }
+                    } else {
+                        const errorData = await res.json();
+                        alert(`대화를 시작할 수 없습니다: ${errorData.detail || '알 수 없는 오류'}`);
+                        window.location.href = '/diary/';
+                    }
+                }
+            } catch (error) {
+                console.error('Error starting conversation:', error);
+                alert('오류가 발생했습니다.');
+                window.location.href = '/diary/';
+            }
+        }
+
+        // Add message to chat
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            messageDiv.innerHTML = `
+                <div>
+                    <div class="message-bubble">${content}</div>
+                    <div class="message-time">${timeStr}</div>
+                </div>
+            `;
+
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        // Show typing indicator
+        function showTyping() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = `
+                <div class="typing-indicator active">
+                    <span></span><span></span><span></span>
+                </div>
+            `;
+            messagesArea.appendChild(typingDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        // Remove typing indicator
+        function hideTyping() {
+            const typingDiv = document.getElementById('typingIndicator');
+            if (typingDiv) {
+                typingDiv.remove();
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content || !conversationId) return;
+
+            // Add user message to UI
+            addMessage('user', content);
+            messageInput.value = '';
+
+            // Show typing indicator
+            showTyping();
+
+            try {
+                const res = await fetch(`/diary/api/conversations/${conversationId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                hideTyping();
+
+                if (res.ok) {
+                    const data = await res.json();
+                    addMessage('ai', data.content);
+                } else {
+                    addMessage('ai', '죄송합니다. 응답을 생성하는 중 오류가 발생했습니다.');
+                }
+            } catch (error) {
+                hideTyping();
+                console.error('Error sending message:', error);
+                addMessage('ai', '죄송합니다. 오류가 발생했습니다.');
+            }
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        finishBtn.addEventListener('click', () => {
+            if (!conversationId) {
+                alert('대화를 먼저 시작해주세요.');
+                return;
+            }
+            document.getElementById('diaryModal').classList.add('active');
+        });
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('diaryModal').classList.remove('active');
+        }
+
+        // Generate diary
+        async function generateDiary(lengthType) {
+            closeModal();
+
+            // Show loading
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loadingDiary';
+            loadingDiv.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 2000; color: white; font-size: 18px;';
+            loadingDiv.innerHTML = '<div>일기를 생성하고 있습니다... ✍️</div>';
+            document.body.appendChild(loadingDiv);
+
+            try {
+                // Parse the entry date to create the title
+                const [year, month, day] = entryDate.split('-');
+                const title = `${year}년 ${parseInt(month)}월 ${parseInt(day)}일의 일기`;
+
+                const res = await fetch(`/diary/api/diaries?conversation_id=${conversationId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        length_type: lengthType
+                    })
+                });
+
+                if (res.ok) {
+                    alert('일기가 생성되었습니다!');
+                    window.location.href = '/diary/';
+                } else {
+                    const error = await res.json();
+                    alert(`일기 생성 실패: ${error.detail || '알 수 없는 오류'}`);
+                }
+            } catch (error) {
+                console.error('Error generating diary:', error);
+                alert('일기 생성 중 오류가 발생했습니다.');
+            } finally {
+                loadingDiv.remove();
+            }
+        }
+
+        // Initialize
+        startConversation();
+    </script>
+</body>
+</html>

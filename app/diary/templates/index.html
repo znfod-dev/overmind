@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나의 일기장 - Overmind</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        .user-menu {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+        }
+        .calendar-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .calendar-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+        }
+        .calendar-nav button {
+            background: #f0f0f0;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .calendar-nav button:hover {
+            background: #e0e0e0;
+        }
+        .calendar {
+            width: 100%;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+        .calendar-day-header {
+            text-align: center;
+            font-weight: 600;
+            color: #666;
+            padding: 10px 0;
+            font-size: 14px;
+        }
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            font-size: 14px;
+        }
+        .calendar-day:hover {
+            background: #f0f0f0;
+        }
+        .calendar-day.other-month {
+            color: #ccc;
+        }
+        .calendar-day.today {
+            background: #e3f2fd;
+            font-weight: 600;
+        }
+        .calendar-day.selected {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        .calendar-day.has-diary::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            width: 4px;
+            height: 4px;
+            background: #667eea;
+            border-radius: 50%;
+        }
+        .calendar-day.selected.has-diary::after {
+            background: white;
+        }
+        .diary-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-height: 500px;
+        }
+        .diary-date {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .no-diary {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        .no-diary p {
+            color: #999;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        .btn-large {
+            padding: 15px 40px;
+            font-size: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-large:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .diary-content {
+            line-height: 1.8;
+            color: #333;
+            font-size: 15px;
+        }
+        .diary-meta {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>📔 나의 일기장</h1>
+            <div class="user-menu">
+                <span id="userEmail" style="color: #666; font-size: 14px;"></span>
+                <a href="/auth/me" class="btn btn-secondary">마이페이지</a>
+                <button onclick="logout()" class="btn btn-secondary">로그아웃</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 달력 섹션 -->
+        <div class="calendar-section">
+            <div class="calendar-header">
+                <h2 id="calendarTitle"></h2>
+                <div class="calendar-nav">
+                    <button onclick="changeMonth(-1)">◀</button>
+                    <button onclick="changeMonth(1)">▶</button>
+                </div>
+            </div>
+            <div class="calendar">
+                <div class="calendar-grid">
+                    <div class="calendar-day-header">일</div>
+                    <div class="calendar-day-header">월</div>
+                    <div class="calendar-day-header">화</div>
+                    <div class="calendar-day-header">수</div>
+                    <div class="calendar-day-header">목</div>
+                    <div class="calendar-day-header">금</div>
+                    <div class="calendar-day-header">토</div>
+                </div>
+                <div class="calendar-grid" id="calendarDays"></div>
+            </div>
+        </div>
+
+        <!-- 일기 섹션 -->
+        <div class="diary-section">
+            <div class="diary-date" id="selectedDate"></div>
+            <div id="diaryContent">
+                <div class="loading">달력에서 날짜를 선택해주세요</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+
+        // Check if logged in
+        if (!token) {
+            window.location.href = '/auth/login';
+        }
+
+        // Helper function to convert Date to local YYYY-MM-DD string
+        function toLocalISODate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+        let selectedDate = new Date();
+        let diariesWithEntries = new Set(); // 일기가 있는 날짜들
+
+        // Load user info
+        async function loadUserInfo() {
+            try {
+                const res = await fetch('/auth/api/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const user = await res.json();
+                    document.getElementById('userEmail').textContent = user.email;
+                } else {
+                    window.location.href = '/auth/login';
+                }
+            } catch (error) {
+                console.error('Error loading user:', error);
+                window.location.href = '/auth/login';
+            }
+        }
+
+        // Load diaries for current month
+        async function loadDiariesForMonth() {
+            try {
+                // 해당 월의 시작일과 종료일
+                const startDate = new Date(currentYear, currentMonth, 1);
+                const endDate = new Date(currentYear, currentMonth + 1, 0);
+
+                const startStr = toLocalISODate(startDate);
+                const endStr = toLocalISODate(endDate);
+
+                const res = await fetch(`/diary/api/diaries?start_date=${startStr}&end_date=${endStr}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    diariesWithEntries.clear();
+                    data.entries.forEach(diary => {
+                        diariesWithEntries.add(diary.entry_date);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading diaries:', error);
+            }
+        }
+
+        // Render calendar
+        async function renderCalendar() {
+            await loadDiariesForMonth();
+
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const prevLastDay = new Date(currentYear, currentMonth, 0);
+
+            const firstDayOfWeek = firstDay.getDay();
+            const lastDate = lastDay.getDate();
+            const prevLastDate = prevLastDay.getDate();
+
+            // Update title
+            document.getElementById('calendarTitle').textContent =
+                `${currentYear}년 ${currentMonth + 1}월`;
+
+            let days = '';
+
+            // Previous month days
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const day = prevLastDate - i;
+                days += `<div class="calendar-day other-month">${day}</div>`;
+            }
+
+            // Current month days
+            const today = new Date();
+            for (let i = 1; i <= lastDate; i++) {
+                const date = new Date(currentYear, currentMonth, i);
+                const dateStr = toLocalISODate(date);
+
+                let classes = 'calendar-day';
+
+                if (date.toDateString() === today.toDateString()) {
+                    classes += ' today';
+                }
+
+                if (date.toDateString() === selectedDate.toDateString()) {
+                    classes += ' selected';
+                }
+
+                if (diariesWithEntries.has(dateStr)) {
+                    classes += ' has-diary';
+                }
+
+                days += `<div class="${classes}" onclick="selectDate(${i})">${i}</div>`;
+            }
+
+            // Next month days
+            const remainingDays = 42 - (firstDayOfWeek + lastDate);
+            for (let i = 1; i <= remainingDays; i++) {
+                days += `<div class="calendar-day other-month">${i}</div>`;
+            }
+
+            document.getElementById('calendarDays').innerHTML = days;
+        }
+
+        // Select date
+        async function selectDate(day) {
+            selectedDate = new Date(currentYear, currentMonth, day);
+            renderCalendar();
+            await loadDiaryForDate();
+        }
+
+        // Change month
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            } else if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        }
+
+        // Load diary for selected date
+        async function loadDiaryForDate() {
+            const dateStr = toLocalISODate(selectedDate);
+            document.getElementById('selectedDate').textContent =
+                `${selectedDate.getFullYear()}년 ${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일`;
+
+            document.getElementById('diaryContent').innerHTML = '<div class="loading">로딩 중...</div>';
+
+            try {
+                const res = await fetch(`/diary/api/diaries/date/${dateStr}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const diary = await res.json();
+                    displayDiary(diary);
+                } else if (res.status === 404) {
+                    displayNoDiary();
+                } else {
+                    document.getElementById('diaryContent').innerHTML =
+                        '<div class="loading">일기를 불러오는 중 오류가 발생했습니다.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading diary:', error);
+                document.getElementById('diaryContent').innerHTML =
+                    '<div class="loading">일기를 불러오는 중 오류가 발생했습니다.</div>';
+            }
+        }
+
+        // Display diary
+        function displayDiary(diary) {
+            let content = '';
+
+            if (diary.mood || diary.summary) {
+                content += '<div class="diary-meta">';
+                if (diary.mood) {
+                    content += `<div>기분: ${diary.mood}</div>`;
+                }
+                if (diary.summary) {
+                    content += `<div>요약: ${diary.summary}</div>`;
+                }
+                content += '</div>';
+            }
+
+            content += `<div class="diary-content">${diary.content.replace(/\n/g, '<br>')}</div>`;
+
+            document.getElementById('diaryContent').innerHTML = content;
+        }
+
+        // Display no diary
+        function displayNoDiary() {
+            const dateStr = toLocalISODate(selectedDate);
+            document.getElementById('diaryContent').innerHTML = `
+                <div class="no-diary">
+                    <p>📝 이 날의 일기가 아직 없습니다</p>
+                    <button class="btn-large" onclick="location.href='/diary/write?date=${dateStr}'">
+                        일기 작성하기
+                    </button>
+                </div>
+            `;
+        }
+
+        // Logout
+        function logout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('user');
+            window.location.href = '/auth/login';
+        }
+
+        // Initialize
+        loadUserInfo();
+        renderCalendar();
+        loadDiaryForDate();
+    </script>
+</body>
+</html>

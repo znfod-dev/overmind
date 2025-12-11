@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마이페이지 - Overmind</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        .user-menu {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .alert-error {
+            background: #fee;
+            color: #c33;
+            border: 2px solid #fcc;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .alert-success {
+            background: #efe;
+            color: #2d8639;
+            border: 2px solid #cfc;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .profile-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .profile-section h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .info-value {
+            color: #333;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-admin {
+            background: #fee;
+            color: #c33;
+        }
+        .badge-user {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>⚙️ 마이페이지</h1>
+            <div class="user-menu">
+                <span id="userEmailHeader" style="color: #666; font-size: 14px;"></span>
+                <a href="/diary/" class="btn">일기장으로</a>
+                <button onclick="logout()" class="btn btn-secondary">로그아웃</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">
+        <p>Loading...</p>
+    </div>
+
+    <div id="content" class="container" style="display: none;">
+        <div id="message"></div>
+
+    <!-- 사용자 정보 섹션 -->
+    <div class="profile-section">
+        <h2>계정 정보</h2>
+        <div class="info-row">
+            <span class="info-label">이메일</span>
+            <span class="info-value" id="userEmail"></span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">역할</span>
+            <span class="info-value">
+                <span class="badge" id="userRoleBadge"></span>
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">가입일</span>
+            <span class="info-value" id="userCreated"></span>
+        </div>
+    </div>
+
+    <!-- 프로필 수정 섹션 -->
+    <div class="profile-section">
+        <h2>프로필 정보</h2>
+        <form id="profileForm">
+            <div class="form-group">
+                <label for="nickname">닉네임</label>
+                <input type="text" id="nickname" name="nickname" maxlength="50">
+            </div>
+            <div class="form-group">
+                <label for="birth_date">생년월일</label>
+                <input type="date" id="birth_date" name="birth_date">
+            </div>
+            <div class="form-group">
+                <label for="gender">성별</label>
+                <select id="gender" name="gender" style="width: 100%; padding: 12px; border: 2px solid #e1e8ed; border-radius: 6px;">
+                    <option value="">선택 안함</option>
+                    <option value="male">남성</option>
+                    <option value="female">여성</option>
+                    <option value="other">기타</option>
+                    <option value="prefer_not_to_say">밝히고 싶지 않음</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="job">직업</label>
+                <input type="text" id="job" name="job" maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="hobbies">취미 (쉼표로 구분)</label>
+                <input type="text" id="hobbies" name="hobbies" placeholder="독서, 게임, 운동">
+            </div>
+            <div class="form-group">
+                <label for="family_composition">가족 구성</label>
+                <input type="text" id="family_composition" name="family_composition" maxlength="200">
+            </div>
+            <div class="form-group">
+                <label for="pets">반려동물</label>
+                <input type="text" id="pets" name="pets" maxlength="200" placeholder="고양이 1마리">
+            </div>
+            <button type="submit" class="btn">프로필 저장</button>
+        </form>
+    </div>
+
+    <!-- 비밀번호 변경 섹션 -->
+    <div class="profile-section">
+        <h2>비밀번호 변경</h2>
+        <form id="passwordForm">
+            <div class="form-group">
+                <label for="current_password">현재 비밀번호</label>
+                <input type="password" id="current_password" name="current_password" required>
+            </div>
+            <div class="form-group">
+                <label for="new_password">새 비밀번호 (최소 8자)</label>
+                <input type="password" id="new_password" name="new_password" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label for="confirm_new_password">새 비밀번호 확인</label>
+                <input type="password" id="confirm_new_password" name="confirm_new_password" required minlength="8">
+            </div>
+            <button type="submit" class="btn">비밀번호 변경</button>
+        </form>
+    </div>
+
+    <div class="profile-section" style="border: none; text-align: center;">
+        <button id="adminBtn" style="display: none;" onclick="location.href='/admin/'" class="btn">관리자 페이지</button>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('access_token');
+
+// Check if logged in
+if (!token) {
+    window.location.href = '/auth/login';
+}
+
+let currentUser = null;
+
+// Load user data
+async function loadUserData() {
+    try {
+        // Get current user
+        const userRes = await fetch('/auth/api/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (userRes.status === 401 || userRes.status === 403) {
+            alert('로그인이 필요합니다.');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        currentUser = await userRes.json();
+
+        // Display user info in header
+        document.getElementById('userEmailHeader').textContent = currentUser.email;
+
+        // Display user info
+        document.getElementById('userEmail').textContent = currentUser.email;
+        document.getElementById('userRoleBadge').textContent = currentUser.role;
+        document.getElementById('userRoleBadge').className = `badge badge-${currentUser.role}`;
+        document.getElementById('userCreated').textContent = new Date(currentUser.created_at).toLocaleDateString();
+
+        // Show admin button if user is admin
+        if (currentUser.role === 'admin') {
+            document.getElementById('adminBtn').style.display = 'inline-block';
+        }
+
+        // Get profile data
+        const profileRes = await fetch('/auth/api/profile', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (profileRes.ok) {
+            const profile = await profileRes.json();
+
+            // Populate form
+            document.getElementById('nickname').value = profile.nickname || '';
+            document.getElementById('birth_date').value = profile.birth_date || '';
+            document.getElementById('gender').value = profile.gender || '';
+            document.getElementById('job').value = profile.job || '';
+            document.getElementById('hobbies').value = profile.hobbies || '';
+            document.getElementById('family_composition').value = profile.family_composition || '';
+            document.getElementById('pets').value = profile.pets || '';
+        }
+
+        // Show content
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading user data:', error);
+        alert('데이터를 불러오는 중 오류가 발생했습니다.');
+        window.location.href = '/auth/login';
+    }
+}
+
+// 프로필 수정
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+
+    // 버튼 비활성화 및 로딩 표시
+    submitBtn.disabled = true;
+    submitBtn.textContent = '저장 중...';
+    submitBtn.style.opacity = '0.6';
+
+    const formData = {
+        nickname: document.getElementById('nickname').value || null,
+        birth_date: document.getElementById('birth_date').value || null,
+        gender: document.getElementById('gender').value || null,
+        job: document.getElementById('job').value || null,
+        hobbies: document.getElementById('hobbies').value || null,
+        family_composition: document.getElementById('family_composition').value || null,
+        pets: document.getElementById('pets').value || null,
+    };
+
+    try {
+        const response = await fetch('/auth/api/profile', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+            document.getElementById('message').innerHTML = '<div class="alert alert-success">✅ 프로필이 저장되었습니다.</div>';
+            // 스크롤을 메시지 위치로 이동
+            document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setTimeout(() => {
+                document.getElementById('message').innerHTML = '';
+            }, 5000);
+        } else {
+            const data = await response.json();
+            document.getElementById('message').innerHTML = `<div class="alert alert-error">❌ ${data.detail || '저장 실패'}</div>`;
+            document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    } catch (error) {
+        console.error('Profile save error:', error);
+        document.getElementById('message').innerHTML = '<div class="alert alert-error">❌ 서버 오류가 발생했습니다.</div>';
+        document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } finally {
+        // 버튼 복원
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        submitBtn.style.opacity = '1';
+    }
+});
+
+// 비밀번호 변경
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+
+    const currentPassword = document.getElementById('current_password').value;
+    const newPassword = document.getElementById('new_password').value;
+    const confirmNewPassword = document.getElementById('confirm_new_password').value;
+
+    if (newPassword !== confirmNewPassword) {
+        document.getElementById('message').innerHTML = '<div class="alert alert-error">❌ 새 비밀번호가 일치하지 않습니다.</div>';
+        document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return;
+    }
+
+    // 버튼 비활성화 및 로딩 표시
+    submitBtn.disabled = true;
+    submitBtn.textContent = '변경 중...';
+    submitBtn.style.opacity = '0.6';
+
+    try {
+        const response = await fetch('/auth/api/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+
+        if (response.ok) {
+            document.getElementById('message').innerHTML = '<div class="alert alert-success">✅ 비밀번호가 변경되었습니다.</div>';
+            document.getElementById('passwordForm').reset();
+            document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setTimeout(() => {
+                document.getElementById('message').innerHTML = '';
+            }, 5000);
+        } else {
+            const data = await response.json();
+            document.getElementById('message').innerHTML = `<div class="alert alert-error">❌ ${data.detail || '변경 실패'}</div>`;
+            document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    } catch (error) {
+        console.error('Password change error:', error);
+        document.getElementById('message').innerHTML = '<div class="alert alert-error">❌ 서버 오류가 발생했습니다.</div>';
+        document.getElementById('message').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } finally {
+        // 버튼 복원
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        submitBtn.style.opacity = '1';
+    }
+});
+
+// 로그아웃
+function logout() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    window.location.href = '/auth/login';
+}
+
+// Load data on page load
+loadUserData();
+</script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}User Details{% endblock %}
+
+{% block content %}
+<div id="loading" style="text-align: center; padding: 40px;">
+    <p>Loading...</p>
+</div>
+
+<div id="content" style="display: none;">
+    <h2>User Details: <span id="userEmail"></span></h2>
+
+    <div class="card">
+        <h3>Account Information</h3>
+        <table id="userTable"></table>
+    </div>
+
+    <div class="card">
+        <h3>Profile Information</h3>
+        <table id="profileTable"></table>
+    </div>
+
+    <div class="card">
+        <h3>Admin Actions</h3>
+        <div style="margin: 20px 0;">
+            <button id="toggleActiveBtn" class="btn" style="margin-right: 10px;">Toggle Active</button>
+            <button id="toggleBlockBtn" class="btn" style="margin-right: 10px;">Toggle Block</button>
+            <button id="toggleRoleBtn" class="btn" style="margin-right: 10px;">Toggle Role</button>
+            <button id="deleteUserBtn" class="btn btn-danger">Delete User</button>
+        </div>
+        <p style="margin-top: 20px;">
+            <a href="/admin/docs" class="btn">API Documentation</a>
+            <a href="/admin/users" class="btn">Back to User List</a>
+        </p>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('access_token');
+const userId = {{ user_id }};
+
+// Check if logged in
+if (!token) {
+    window.location.href = '/auth/login';
+}
+
+let userData = null;
+
+async function loadUser() {
+    try {
+        // Load user details
+        const userRes = await fetch(`/admin/api/users/${userId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (userRes.status === 403 || userRes.status === 401) {
+            alert('Admin access required');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        if (userRes.status === 404) {
+            alert('User not found');
+            window.location.href = '/admin/users';
+            return;
+        }
+
+        userData = await userRes.json();
+
+        // Update admin email in header
+        const currentUserRes = await fetch('/auth/api/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const currentUser = await currentUserRes.json();
+        document.getElementById('adminInfo').textContent = `Logged in as: ${currentUser.email} (${currentUser.role})`;
+
+        // Display user info
+        document.getElementById('userEmail').textContent = userData.email;
+
+        // Render account info
+        const userTable = document.getElementById('userTable');
+        userTable.innerHTML = `
+            <tr>
+                <td style="width: 150px;"><strong>ID:</strong></td>
+                <td>${userData.id}</td>
+            </tr>
+            <tr>
+                <td><strong>Email:</strong></td>
+                <td>${userData.email}</td>
+            </tr>
+            <tr>
+                <td><strong>Role:</strong></td>
+                <td><span class="badge badge-${userData.role}">${userData.role}</span></td>
+            </tr>
+            <tr>
+                <td><strong>Active:</strong></td>
+                <td>${userData.is_active ? "Yes" : "No"}</td>
+            </tr>
+            <tr>
+                <td><strong>Blocked:</strong></td>
+                <td>${userData.is_blocked ? "Yes" : "No"}</td>
+            </tr>
+            <tr>
+                <td><strong>Created:</strong></td>
+                <td>${new Date(userData.created_at).toLocaleString()}</td>
+            </tr>
+            <tr>
+                <td><strong>Updated:</strong></td>
+                <td>${new Date(userData.updated_at).toLocaleString()}</td>
+            </tr>
+        `;
+
+        // Render profile info
+        const profile = userData.profile || {};
+        const profileTable = document.getElementById('profileTable');
+        profileTable.innerHTML = `
+            <tr>
+                <td style="width: 150px;"><strong>Nickname:</strong></td>
+                <td>${profile.nickname || "Not set"}</td>
+            </tr>
+            <tr>
+                <td><strong>Birth Date:</strong></td>
+                <td>${profile.birth_date || "Not set"}</td>
+            </tr>
+            <tr>
+                <td><strong>Gender:</strong></td>
+                <td>${profile.gender || "Not set"}</td>
+            </tr>
+            <tr>
+                <td><strong>Job:</strong></td>
+                <td>${profile.job || "Not set"}</td>
+            </tr>
+            <tr>
+                <td><strong>Hobbies:</strong></td>
+                <td>${profile.hobbies || "Not set"}</td>
+            </tr>
+            <tr>
+                <td><strong>Family:</strong></td>
+                <td>${profile.family_composition || "Not set"}</td>
+            </tr>
+            <tr>
+                <td><strong>Pets:</strong></td>
+                <td>${profile.pets || "Not set"}</td>
+            </tr>
+        `;
+
+        // Show content
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading user:', error);
+        alert('Error loading user details');
+        window.location.href = '/admin/users';
+    }
+}
+
+// Toggle Active
+document.getElementById('toggleActiveBtn').addEventListener('click', async () => {
+    if (!confirm(`Are you sure you want to ${userData.is_active ? 'deactivate' : 'activate'} this user?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/api/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_active: !userData.is_active })
+        });
+
+        if (res.ok) {
+            alert('User status updated');
+            location.reload();
+        } else {
+            const error = await res.json();
+            alert(`Error: ${error.detail}`);
+        }
+    } catch (error) {
+        alert('Error updating user');
+    }
+});
+
+// Toggle Block
+document.getElementById('toggleBlockBtn').addEventListener('click', async () => {
+    if (!confirm(`Are you sure you want to ${userData.is_blocked ? 'unblock' : 'block'} this user?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/api/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_blocked: !userData.is_blocked })
+        });
+
+        if (res.ok) {
+            alert('User status updated');
+            location.reload();
+        } else {
+            const error = await res.json();
+            alert(`Error: ${error.detail}`);
+        }
+    } catch (error) {
+        alert('Error updating user');
+    }
+});
+
+// Toggle Role
+document.getElementById('toggleRoleBtn').addEventListener('click', async () => {
+    const newRole = userData.role === 'admin' ? 'user' : 'admin';
+    if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/api/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ role: newRole })
+        });
+
+        if (res.ok) {
+            alert('User role updated');
+            location.reload();
+        } else {
+            const error = await res.json();
+            alert(`Error: ${error.detail}`);
+        }
+    } catch (error) {
+        alert('Error updating user');
+    }
+});
+
+// Delete User
+document.getElementById('deleteUserBtn').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to DELETE this user? This action cannot be undone!')) {
+        return;
+    }
+
+    if (!confirm('FINAL WARNING: This will permanently delete the user and all their data. Continue?')) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/api/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+            alert('User deleted successfully');
+            window.location.href = '/admin/users';
+        } else {
+            const error = await res.json();
+            alert(`Error: ${error.detail}`);
+        }
+    } catch (error) {
+        alert('Error deleting user');
+    }
+});
+
+loadUser();
+</script>
+{% endblock %}

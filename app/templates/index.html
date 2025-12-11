@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overmind AI Gateway</title>
+</head>
+<body>
+    <script>
+        // Check if user is logged in
+        const token = localStorage.getItem('access_token');
+
+        if (token) {
+            // Logged in - redirect to diary
+            window.location.href = '/diary/';
+        } else {
+            // Not logged in - redirect to login
+            window.location.href = '/auth/login';
+        }
+    </script>
+</body>
+</html>

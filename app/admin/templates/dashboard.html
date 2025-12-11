@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2>System Statistics</h2>
+
+<div id="loading" style="text-align: center; padding: 40px;">
+    <p>Loading...</p>
+</div>
+
+<div id="content" style="display: none;">
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="card">
+        <h2>Recent Users</h2>
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+        </table>
+        <br>
+        <a href="/admin/users" class="btn">View All Users</a>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('access_token');
+
+// Check if logged in
+if (!token) {
+    window.location.href = '/auth/login';
+}
+
+async function loadDashboard() {
+    try {
+        // Load statistics
+        const statsRes = await fetch('/admin/api/stats', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (statsRes.status === 403 || statsRes.status === 401) {
+            alert('Admin access required');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        const stats = await statsRes.json();
+
+        // Load recent users
+        const usersRes = await fetch('/admin/api/users?limit=10', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const usersData = await usersRes.json();
+
+        // Render stats
+        document.getElementById('statsGrid').innerHTML = `
+            <div class="stat-card">
+                <h3>Total Users</h3>
+                <div class="number">${stats.total_users}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Admin Users</h3>
+                <div class="number">${stats.admin_users}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Active Users</h3>
+                <div class="number">${stats.active_users}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Blocked Users</h3>
+                <div class="number">${stats.blocked_users}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Diaries</h3>
+                <div class="number">${stats.total_diaries}</div>
+            </div>
+        `;
+
+        // Render users table
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = usersData.users.map(user => {
+            const statusBadge = user.is_blocked ?
+                '<span class="badge badge-blocked">Blocked</span>' :
+                !user.is_active ?
+                '<span class="badge badge-inactive">Inactive</span>' :
+                '<span class="badge badge-active">Active</span>';
+
+            const date = new Date(user.created_at).toLocaleDateString();
+
+            return `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.email}</td>
+                    <td><span class="badge badge-${user.role}">${user.role}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>${date}</td>
+                    <td><a href="/admin/users/${user.id}" class="btn">View</a></td>
+                </tr>
+            `;
+        }).join('');
+
+        // Update admin email in header
+        const userRes = await fetch('/auth/api/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const currentUser = await userRes.json();
+        document.getElementById('adminInfo').textContent = `Logged in as: ${currentUser.email} (${currentUser.role})`;
+
+        // Show content
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        alert('Error loading dashboard');
+        window.location.href = '/auth/login';
+    }
+}
+
+loadDashboard();
+</script>
+{% endblock %}

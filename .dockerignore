@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Environment variables (중요!)
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+
+# Documentation
+docs/
+README.md
+*.md
+
+# Logs (로컬 로그는 제외)
+logs/*.log
+
+# Scripts (배포 스크립트는 이미지에 불필요)
+scripts/deploy.py
+
+# Docker
+docker-compose.yml
+.dockerignore
+Dockerfile
+
+# Other
+.claude/

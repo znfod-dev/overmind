@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}로그인 - Overmind{% endblock %}
+
+{% block content %}
+<h1>로그인</h1>
+<p class="subtitle">Overmind AI 서비스</p>
+
+<div id="message"></div>
+
+<form id="loginForm">
+    <div class="form-group">
+        <label for="email">이메일</label>
+        <input type="email" id="email" name="email" required>
+    </div>
+    <div class="form-group">
+        <label for="password">비밀번호</label>
+        <input type="password" id="password" name="password" required>
+    </div>
+    <button type="submit" class="btn">로그인</button>
+</form>
+
+<div class="link">
+    계정이 없으신가요? <a href="/auth/signup">회원가입</a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const messageDiv = document.getElementById('message');
+
+    try {
+        const response = await fetch('/auth/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // JWT 토큰 저장
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            messageDiv.innerHTML = '<div class="alert alert-success">로그인 성공!</div>';
+
+            // role에 따라 리다이렉트
+            setTimeout(() => {
+                if (data.user.role === 'admin') {
+                    window.location.href = '/admin/';
+                } else {
+                    window.location.href = '/diary/';
+                }
+            }, 500);
+        } else {
+            messageDiv.innerHTML = `<div class="alert alert-error">${data.detail || '로그인 실패'}</div>`;
+        }
+    } catch (error) {
+        messageDiv.innerHTML = '<div class="alert alert-error">서버 오류가 발생했습니다.</div>';
+    }
+});
+</script>
+{% endblock %}

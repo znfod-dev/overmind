@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}회원가입 - Overmind{% endblock %}
+
+{% block content %}
+<h1>회원가입</h1>
+<p class="subtitle">Overmind AI 서비스에 오신 것을 환영합니다</p>
+
+<div id="message"></div>
+
+<form id="signupForm">
+    <div class="form-group">
+        <label for="email">이메일</label>
+        <input type="email" id="email" name="email" required>
+    </div>
+    <div class="form-group">
+        <label for="password">비밀번호 (최소 8자)</label>
+        <input type="password" id="password" name="password" required minlength="8">
+    </div>
+    <div class="form-group">
+        <label for="confirmPassword">비밀번호 확인</label>
+        <input type="password" id="confirmPassword" name="confirmPassword" required minlength="8">
+    </div>
+    <button type="submit" class="btn">가입하기</button>
+</form>
+
+<div class="link">
+    이미 계정이 있으신가요? <a href="/auth/login">로그인</a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const messageDiv = document.getElementById('message');
+
+    // 비밀번호 확인
+    if (password !== confirmPassword) {
+        messageDiv.innerHTML = '<div class="alert alert-error">비밀번호가 일치하지 않습니다.</div>';
+        return;
+    }
+
+    try {
+        const response = await fetch('/auth/api/signup', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // JWT 토큰 저장
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            messageDiv.innerHTML = '<div class="alert alert-success">회원가입 성공! 일기장으로 이동합니다...</div>';
+
+            setTimeout(() => {
+                window.location.href = '/diary/';
+            }, 1000);
+        } else {
+            messageDiv.innerHTML = `<div class="alert alert-error">${data.detail || '회원가입 실패'}</div>`;
+        }
+    } catch (error) {
+        messageDiv.innerHTML = '<div class="alert alert-error">서버 오류가 발생했습니다.</div>';
+    }
+});
+</script>
+{% endblock %}

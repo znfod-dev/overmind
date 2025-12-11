@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}User List{% endblock %}
+
+{% block content %}
+<div id="loading" style="text-align: center; padding: 40px;">
+    <p>Loading...</p>
+</div>
+
+<div id="content" style="display: none;">
+    <div class="card">
+        <h2>All Users (<span id="totalUsers">0</span> total)</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div id="pagination" style="margin-top: 20px; text-align: center; display: none;">
+            <button id="prevBtn" class="btn" style="display: none;">Previous</button>
+            <span id="pageInfo" style="margin: 0 20px;"></span>
+            <button id="nextBtn" class="btn" style="display: none;">Next</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('access_token');
+
+// Check if logged in
+if (!token) {
+    window.location.href = '/auth/login';
+}
+
+// Get current page from URL
+const urlParams = new URLSearchParams(window.location.search);
+let currentPage = parseInt(urlParams.get('page')) || 1;
+
+async function loadUsers() {
+    try {
+        // Load users
+        const usersRes = await fetch(`/admin/api/users?page=${currentPage}&limit=20`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (usersRes.status === 403 || usersRes.status === 401) {
+            alert('Admin access required');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        const data = await usersRes.json();
+
+        // Update admin email in header
+        const userRes = await fetch('/auth/api/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const currentUser = await userRes.json();
+        document.getElementById('adminInfo').textContent = `Logged in as: ${currentUser.email} (${currentUser.role})`;
+
+        // Update total count
+        document.getElementById('totalUsers').textContent = data.total;
+
+        // Render users table
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = data.users.map(user => {
+            const statusBadge = user.is_blocked ?
+                '<span class="badge badge-blocked">Blocked</span>' :
+                !user.is_active ?
+                '<span class="badge badge-inactive">Inactive</span>' :
+                '<span class="badge badge-active">Active</span>';
+
+            const date = new Date(user.created_at).toLocaleString();
+
+            return `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.email}</td>
+                    <td><span class="badge badge-${user.role}">${user.role}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>${date}</td>
+                    <td><a href="/admin/users/${user.id}" class="btn">View/Edit</a></td>
+                </tr>
+            `;
+        }).join('');
+
+        // Pagination
+        const totalPages = data.total_pages;
+        if (totalPages > 1) {
+            document.getElementById('pagination').style.display = 'block';
+            document.getElementById('pageInfo').textContent = `Page ${data.page} of ${totalPages}`;
+
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            if (data.page > 1) {
+                prevBtn.style.display = 'inline-block';
+                prevBtn.onclick = () => {
+                    window.location.href = `/admin/users?page=${data.page - 1}`;
+                };
+            } else {
+                prevBtn.style.display = 'none';
+            }
+
+            if (data.page < totalPages) {
+                nextBtn.style.display = 'inline-block';
+                nextBtn.onclick = () => {
+                    window.location.href = `/admin/users?page=${data.page + 1}`;
+                };
+            } else {
+                nextBtn.style.display = 'none';
+            }
+        }
+
+        // Show content
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading users:', error);
+        alert('Error loading users');
+        window.location.href = '/auth/login';
+    }
+}
+
+loadUsers();
+</script>
+{% endblock %}
