@@ -2,7 +2,7 @@
 
 from typing import Optional
 from datetime import date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class UserUpdateRequest(BaseModel):
@@ -43,5 +43,26 @@ class UserProfileUpdateRequest(BaseModel):
                 "hobbies": "reading, gaming",
                 "family_composition": "Spouse and 2 kids",
                 "pets": "1 cat"
+            }
+        }
+
+
+class AIModelPriorityUpdateRequest(BaseModel):
+    """AI 모델 우선순위 업데이트 요청"""
+
+    country: str = Field(..., pattern="^[A-Z]{2}$", description="Country code (KR/VN/US/JP/WW)")
+    tier: str = Field(..., pattern="^(basic|premium)$", description="Tier (basic/premium)")
+    priority_1: str = Field(..., pattern="^(openai|google_ai|claude)$", description="1st priority AI provider")
+    priority_2: str = Field(..., pattern="^(openai|google_ai|claude)$", description="2nd priority AI provider")
+    priority_3: str = Field(..., pattern="^(openai|google_ai|claude)$", description="3rd priority AI provider")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "country": "KR",
+                "tier": "basic",
+                "priority_1": "openai",
+                "priority_2": "google_ai",
+                "priority_3": "claude"
             }
         }

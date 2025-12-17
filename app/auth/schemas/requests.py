@@ -10,12 +10,14 @@ class SignupRequest(BaseModel):
 
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=100, description="Password (8-100 characters)")
+    country: str = Field(default="WW", pattern="^(KR|VN|US|JP|WW)$", description="Country code (KR/VN/US/JP/WW)")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "email": "user@example.com",
-                "password": "securePassword123"
+                "password": "securePassword123",
+                "country": "KR"
             }
         }
 
@@ -47,6 +49,7 @@ class ProfileUpdateRequest(BaseModel):
     hobbies: Optional[str] = Field(None, description="Hobbies (comma-separated)")
     family_composition: Optional[str] = Field(None, max_length=200, description="Family composition")
     pets: Optional[str] = Field(None, max_length=200, description="Pets information")
+    country: Optional[str] = Field(None, pattern="^(KR|VN|US|JP|WW)$", description="Country code (KR/VN/US/JP/WW)")
 
     class Config:
         json_schema_extra = {

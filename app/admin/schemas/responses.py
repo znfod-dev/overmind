@@ -89,3 +89,31 @@ class StatsResponse(BaseModel):
                 "total_diaries": 450
             }
         }
+
+
+class AIModelPriorityResponse(BaseModel):
+    """AI 모델 우선순위 응답"""
+
+    id: int
+    country: str
+    tier: str
+    priority_1: str
+    priority_2: str
+    priority_3: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "country": "KR",
+                "tier": "basic",
+                "priority_1": "openai",
+                "priority_2": "google_ai",
+                "priority_3": "claude",
+                "created_at": "2025-12-17T10:00:00",
+                "updated_at": "2025-12-17T10:00:00"
+            }
+        }

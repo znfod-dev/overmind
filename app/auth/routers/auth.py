@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api", tags=["auth"])
     response_model=TokenResponse,
     status_code=status.HTTP_201_CREATED,
     summary="User signup",
-    description="Register a new user account with email and password"
+    description="Register a new user account with email, password, and country"
 )
 async def signup(
     request: SignupRequest,
@@ -30,11 +30,12 @@ async def signup(
     Register a new user
 
     - Creates user account with hashed password
-    - Creates empty profile for the user
+    - Creates profile with country information
+    - Creates subscription (default: FREE tier)
     - Returns JWT access token
     """
     service = AuthService(db)
-    user, token = await service.signup(request.email, request.password)
+    user, token = await service.signup(request.email, request.password, request.country)
 
     return TokenResponse(
         access_token=token,

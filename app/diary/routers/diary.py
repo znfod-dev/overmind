@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import User
+from app.core.exceptions import BadRequestError, ErrorCode
 from app.diary.schemas.requests import GenerateDiaryRequest
 from app.diary.schemas.responses import DiaryEntryResponse, DiaryListResponse
 from app.diary.services.diary import DiaryService
@@ -89,26 +90,34 @@ async def list_diaries(
 
 @router.get(
     "/date/{entry_date}",
-    response_model=DiaryEntryResponse,
+    response_model=Optional[DiaryEntryResponse],
     summary="Get diary by date",
-    description="Get diary entry for specific date"
+    description="Get diary entry for specific date (returns null if not found)"
 )
 async def get_diary_by_date(
     entry_date: str,  # YYYY-MM-DD
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
-) -> DiaryEntryResponse:
-    """Get diary for specific date"""
+) -> Optional[DiaryEntryResponse]:
+    """
+    Get diary for specific date
+
+    Returns null if no diary exists for this date (not an error)
+    """
     try:
         date_obj = date.fromisoformat(entry_date)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid date format. Use YYYY-MM-DD"
+        raise BadRequestError(
+            error_code=ErrorCode.INVALID_DATE_FORMAT,
+            message="날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.",
+            details={"provided_date": entry_date, "expected_format": "YYYY-MM-DD"}
         )
 
     service = DiaryService(db)
     diary = await service.get_diary_by_date(date_obj, current_user.id)
+
+    if diary is None:
+        return None
 
     return DiaryEntryResponse.model_validate(diary)
 

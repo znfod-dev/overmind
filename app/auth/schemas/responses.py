@@ -62,6 +62,8 @@ class ProfileResponse(BaseModel):
     hobbies: Optional[str] = None
     family_composition: Optional[str] = None
     pets: Optional[str] = None
+    country: Optional[str] = None
+    profile_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -75,7 +77,8 @@ class ProfileResponse(BaseModel):
                 "job": "Software Engineer",
                 "hobbies": "reading, gaming",
                 "family_composition": "Spouse and 2 kids",
-                "pets": "1 cat"
+                "pets": "1 cat",
+                "country": "KR"
             }
         }
 

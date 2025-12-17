@@ -8,7 +8,7 @@ from sqlalchemy import select
 from fastapi import HTTPException, status
 
 from app.config import settings
-from app.core.ai_helper import call_ai_service
+from app.core.ai_helper import call_ai_for_user
 from app.models import Conversation, Message, Profile, ConversationStatus, MessageRole
 from app.diary.services.prompts import create_conversation_prompt
 
@@ -163,6 +163,7 @@ class ConversationService:
 
         # Generate AI response
         ai_response_text = await self._call_ai_service(
+            user_id=user_id,
             user_message=content,
             conversation_history=history,
             profile=profile_dict
@@ -204,21 +205,24 @@ class ConversationService:
 
     async def _call_ai_service(
         self,
+        user_id: int,
         user_message: str,
         conversation_history: list[dict],
         profile: Optional[dict] = None
     ) -> str:
         """
-        Call AI service to generate response
+        Call AI service to generate response (사용자별 최적 모델)
 
-        Similar to Translation service pattern
+        Uses call_ai_for_user to automatically select best AI model
+        based on user's country and subscription tier.
         """
         prompt = create_conversation_prompt(user_message, conversation_history, profile)
 
         try:
-            result = await call_ai_service(
+            result = await call_ai_for_user(
+                user_id=user_id,
                 prompt=prompt,
-                provider="claude",
+                db=self.db,
                 max_tokens=500,
                 temperature=0.8,
                 timeout=30.0

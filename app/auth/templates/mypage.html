@@ -232,6 +232,16 @@
                 <label for="pets">반려동물</label>
                 <input type="text" id="pets" name="pets" maxlength="200" placeholder="고양이 1마리">
             </div>
+            <div class="form-group">
+                <label for="country">국가</label>
+                <select id="country" name="country" style="width: 100%; padding: 12px; border: 2px solid #e1e8ed; border-radius: 6px;">
+                    <option value="WW">전세계 (기타)</option>
+                    <option value="KR">🇰🇷 대한민국</option>
+                    <option value="VN">🇻🇳 베트남</option>
+                    <option value="US">🇺🇸 미국</option>
+                    <option value="JP">🇯🇵 일본</option>
+                </select>
+            </div>
             <button type="submit" class="btn">프로필 저장</button>
         </form>
     </div>
@@ -317,6 +327,7 @@ async function loadUserData() {
             document.getElementById('hobbies').value = profile.hobbies || '';
             document.getElementById('family_composition').value = profile.family_composition || '';
             document.getElementById('pets').value = profile.pets || '';
+            document.getElementById('country').value = profile.country || 'WW';
         }
 
         // Show content
@@ -350,6 +361,7 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
         hobbies: document.getElementById('hobbies').value || null,
         family_composition: document.getElementById('family_composition').value || null,
         pets: document.getElementById('pets').value || null,
+        country: document.getElementById('country').value || null,
     };
 
     try {

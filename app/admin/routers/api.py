@@ -7,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_admin_user
 from app.models import User
-from app.admin.schemas.requests import UserUpdateRequest, UserProfileUpdateRequest
-from app.admin.schemas.responses import UserDetailResponse, UserListResponse, StatsResponse
+from app.admin.schemas.requests import UserUpdateRequest, UserProfileUpdateRequest, AIModelPriorityUpdateRequest
+from app.admin.schemas.responses import UserDetailResponse, UserListResponse, StatsResponse, AIModelPriorityResponse
 from app.admin.services.admin import AdminService
+from app.admin.services.ai_config import AIConfigService
 from app.auth.schemas.responses import ProfileResponse
 
 router = APIRouter(prefix="/api", tags=["admin-api"])
@@ -151,3 +152,61 @@ async def get_statistics(
     stats = await service.get_statistics()
 
     return StatsResponse(**stats)
+
+
+@router.get("/ai-priorities", response_model=list[AIModelPriorityResponse], summary="List AI model priorities")
+async def list_ai_priorities(
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all AI model priorities
+
+    Shows priority settings for all countries and tiers
+    """
+    service = AIConfigService(db)
+    priorities = await service.list_priorities()
+
+    return [AIModelPriorityResponse.model_validate(p) for p in priorities]
+
+
+@router.put("/ai-priorities", response_model=AIModelPriorityResponse, summary="Update AI model priority")
+async def update_ai_priority(
+    request: AIModelPriorityUpdateRequest,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update or create AI model priority for a country/tier
+
+    - Updates existing priority if found
+    - Creates new priority if not found
+    - Validates provider names (openai, google_ai, claude)
+    """
+    service = AIConfigService(db)
+    priority = await service.update_priority(
+        country=request.country,
+        tier=request.tier,
+        priority_1=request.priority_1,
+        priority_2=request.priority_2,
+        priority_3=request.priority_3
+    )
+
+    return AIModelPriorityResponse.model_validate(priority)
+
+
+@router.delete("/ai-priorities/{country}/{tier}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete AI priority")
+async def delete_ai_priority(
+    country: str,
+    tier: str,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete AI model priority for a country/tier
+
+    - Removes priority configuration
+    - System will fall back to WW (worldwide) default
+    """
+    service = AIConfigService(db)
+    await service.delete_priority(country, tier)

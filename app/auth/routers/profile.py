@@ -1,13 +1,13 @@
 """Profile management endpoints"""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import User
 from app.auth.schemas.requests import ProfileUpdateRequest
-from app.auth.schemas.responses import ProfileResponse
+from app.auth.schemas.responses import ProfileResponse, MessageResponse
 from app.auth.services.auth import AuthService
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
@@ -64,5 +64,30 @@ async def update_profile(
     profile_data = request.model_dump(exclude_unset=True)
 
     profile = await service.update_profile(current_user.id, profile_data)
+
+    return ProfileResponse.model_validate(profile)
+
+
+@router.post(
+    "/image",
+    response_model=ProfileResponse,
+    summary="Upload profile image",
+    description="Uploads a new profile image for the authenticated user. Max file size: 5MB. Allowed types: JPG, PNG."
+)
+async def upload_profile_image(
+    file: UploadFile = File(..., description="Image file to upload (JPG or PNG, max 5MB)"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> ProfileResponse:
+    """
+    Uploads a profile image for the current user.
+
+    - Validates file type and size.
+    - Saves the image to the local storage.
+    - Updates the user's profile with the new image URL.
+    - Returns the updated profile.
+    """
+    service = AuthService(db)
+    profile = await service.upload_profile_image(current_user.id, file)
 
     return ProfileResponse.model_validate(profile)

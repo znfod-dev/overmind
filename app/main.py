@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from starlette.staticfiles import StaticFiles
 
 from app.admin.main import admin_app
 from app.ai.main import ai_app
@@ -74,6 +75,9 @@ app.mount("/translate", translation_app)
 app.mount("/auth", auth_app)
 app.mount("/diary", diary_app)
 app.mount("/admin", admin_app)
+
+# Serve static files from the storage directory
+app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 
 @app.get("/", response_class=HTMLResponse)

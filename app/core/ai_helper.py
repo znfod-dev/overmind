@@ -3,6 +3,7 @@
 from typing import Any, Dict
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.http_client import get_http_client
@@ -81,3 +82,59 @@ async def call_ai_service(
     except httpx.RequestError as e:
         logger.error(f"AI service request error: {e}")
         raise
+
+
+async def call_ai_for_user(
+    user_id: int,
+    prompt: str,
+    db: AsyncSession,
+    max_tokens: int = 1024,
+    temperature: float = 0.7,
+    timeout: float = 30.0
+) -> Dict[str, Any]:
+    """
+    사용자별 최적 AI 모델로 호출 (국가 + 구독 티어 기반)
+
+    이 함수는 사용자의 국가 정보와 구독 티어에 따라 자동으로 최적 AI 모델을 선택하여 호출합니다.
+    AIModelSelector 서비스를 통해 우선순위가 높은 모델을 선택합니다.
+
+    Args:
+        user_id: 사용자 ID
+        prompt: AI에게 전달할 프롬프트
+        db: 데이터베이스 세션 (필수)
+        max_tokens: 최대 생성 토큰 수
+        temperature: 생성 온도 (0.0 ~ 2.0)
+        timeout: 요청 타임아웃 (초)
+
+    Returns:
+        AI API 응답 JSON (dict)
+
+    Raises:
+        httpx.HTTPStatusError: API 호출 실패
+        httpx.TimeoutException: 요청 타임아웃
+        httpx.RequestError: 네트워크 에러
+
+    Example:
+        >>> result = await call_ai_for_user(
+        ...     user_id=1,
+        ...     prompt="안녕하세요!",
+        ...     db=db_session,
+        ...     max_tokens=100
+        ... )
+        >>> print(result["text"])
+    """
+    from app.core.model_selector import AIModelSelector
+
+    selector = AIModelSelector(db)
+    provider, model = await selector.get_model_for_user(user_id)
+
+    logger.info(f"User {user_id} using AI model: {provider}/{model}")
+
+    return await call_ai_service(
+        prompt=prompt,
+        provider=provider,
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        timeout=timeout
+    )

@@ -410,17 +410,48 @@
 
                 if (res.ok) {
                     const diary = await res.json();
-                    displayDiary(diary);
-                } else if (res.status === 404) {
-                    displayNoDiary();
+
+                    // null이면 일기가 없는 것 (정상)
+                    if (diary === null) {
+                        displayNoDiary();
+                    } else {
+                        displayDiary(diary);
+                    }
                 } else {
+                    // 에러 처리
+                    const error = await res.json();
+                    console.error('API Error:', error);
+
+                    // 에러 메시지 표시
+                    let errorMessage = '일기를 불러오는 중 오류가 발생했습니다.';
+
+                    if (error.detail && error.detail.message) {
+                        // 서버에서 제공한 한글 메시지 사용
+                        errorMessage = error.detail.message;
+                    }
+
+                    // 특정 에러 코드별 처리
+                    if (error.detail && error.detail.error_code) {
+                        const errorCode = error.detail.error_code;
+
+                        if (errorCode === 'AUTH_1006' || errorCode === 'AUTH_1005') {
+                            // 토큰 만료 또는 유효하지 않음
+                            alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+                            logout();
+                            return;
+                        } else if (errorCode.startsWith('AI_5')) {
+                            // AI 서비스 에러는 재시도 안내
+                            errorMessage += ' 잠시 후 다시 시도해주세요.';
+                        }
+                    }
+
                     document.getElementById('diaryContent').innerHTML =
-                        '<div class="loading">일기를 불러오는 중 오류가 발생했습니다.</div>';
+                        `<div class="loading">${errorMessage}</div>`;
                 }
             } catch (error) {
-                console.error('Error loading diary:', error);
+                console.error('Network error:', error);
                 document.getElementById('diaryContent').innerHTML =
-                    '<div class="loading">일기를 불러오는 중 오류가 발생했습니다.</div>';
+                    '<div class="loading">네트워크 연결을 확인해주세요.</div>';
             }
         }
 

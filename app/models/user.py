@@ -24,6 +24,7 @@ class User(Base):
 
     # Relationships
     profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    subscription = relationship("Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     diary_entries = relationship("DiaryEntry", back_populates="user", cascade="all, delete-orphan")
 
@@ -44,6 +45,8 @@ class Profile(Base):
     hobbies = Column(Text, nullable=True)  # JSON string: ["reading", "gaming"]
     family_composition = Column(String(200), nullable=True)
     pets = Column(String(200), nullable=True)
+    country = Column(String(2), nullable=True, default="WW")  # ISO 3166-1 alpha-2: KR, VN, US, JP, WW
+    profile_image_url = Column(String(500), nullable=True) # URL or path to the profile image
 
     # Relationship
     user = relationship("User", back_populates="profile")

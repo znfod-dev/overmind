@@ -1,14 +1,16 @@
 """Diary generation service"""
 
 from datetime import datetime, date
+from typing import Optional
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from fastapi import HTTPException, status
 
 from app.config import settings
-from app.core.ai_helper import call_ai_service
+from app.core.ai_helper import call_ai_for_user
 from app.core.logging_config import logger
+from app.core.exceptions import NotFoundError, BadRequestError, ServiceError, ErrorCode
 from app.models import DiaryEntry, Conversation, Message, Profile, DiaryLengthType, ConversationStatus
 from app.diary.services.prompts import (
     create_diary_generation_prompt,
@@ -55,9 +57,10 @@ class DiaryService:
         conversation = conv_result.scalar_one_or_none()
 
         if not conversation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conversation not found"
+            raise NotFoundError(
+                error_code=ErrorCode.CONVERSATION_NOT_FOUND,
+                message="대화를 찾을 수 없습니다.",
+                details={"conversation_id": conversation_id}
             )
 
         # Use the entry_date from the conversation
@@ -72,9 +75,10 @@ class DiaryService:
         messages = msg_result.scalars().all()
 
         if not messages:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Conversation has no messages"
+            raise BadRequestError(
+                error_code=ErrorCode.CONVERSATION_NO_MESSAGES,
+                message="대화 내용이 없어 일기를 생성할 수 없습니다.",
+                details={"conversation_id": conversation_id}
             )
 
         # Get profile
@@ -97,6 +101,7 @@ class DiaryService:
 
         # Generate diary content
         diary_content = await self._generate_diary_content(
+            user_id=user_id,
             conversation_messages=message_list,
             length_type=length_type,
             entry_date=datetime.combine(entry_date, datetime.min.time()),
@@ -104,8 +109,8 @@ class DiaryService:
         )
 
         # Generate mood analysis and summary
-        mood = await self._generate_mood_analysis(diary_content)
-        summary = await self._generate_summary(diary_content)
+        mood = await self._generate_mood_analysis(user_id, diary_content)
+        summary = await self._generate_summary(user_id, diary_content)
 
         # Create diary entry
         diary_entry = DiaryEntry(
@@ -141,15 +146,20 @@ class DiaryService:
         diary = result.scalar_one_or_none()
 
         if not diary:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Diary not found"
+            raise NotFoundError(
+                error_code=ErrorCode.DIARY_NOT_FOUND,
+                message="일기를 찾을 수 없습니다.",
+                details={"diary_id": diary_id}
             )
 
         return diary
 
-    async def get_diary_by_date(self, entry_date: date, user_id: int) -> DiaryEntry:
-        """Get diary by date"""
+    async def get_diary_by_date(self, entry_date: date, user_id: int) -> Optional[DiaryEntry]:
+        """
+        Get diary by date
+
+        Returns None if no diary exists for this date (not an error)
+        """
         result = await self.db.execute(
             select(DiaryEntry)
             .where(
@@ -157,15 +167,7 @@ class DiaryService:
                 DiaryEntry.entry_date == entry_date
             )
         )
-        diary = result.scalar_one_or_none()
-
-        if not diary:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Diary not found for this date"
-            )
-
-        return diary
+        return result.scalar_one_or_none()
 
     async def list_diaries(
         self,
@@ -208,12 +210,13 @@ class DiaryService:
 
     async def _generate_diary_content(
         self,
+        user_id: int,
         conversation_messages: list[dict],
         length_type: str,
         entry_date: datetime,
         profile: dict = None
     ) -> str:
-        """Call AI service to generate diary content"""
+        """Call AI service to generate diary content (사용자별 최적 모델)"""
         prompt = create_diary_generation_prompt(
             conversation_messages=conversation_messages,
             length_type=length_type,
@@ -229,9 +232,10 @@ class DiaryService:
         }
 
         try:
-            result = await call_ai_service(
+            result = await call_ai_for_user(
+                user_id=user_id,
                 prompt=prompt,
-                provider="claude",
+                db=self.db,
                 max_tokens=max_tokens.get(length_type, 2000),
                 temperature=0.7,
                 timeout=60.0
@@ -239,29 +243,36 @@ class DiaryService:
             return result["text"]
 
         except httpx.TimeoutException:
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail="Diary generation timeout"
+            logger.error("Diary generation timeout")
+            raise ServiceError(
+                error_code=ErrorCode.AI_SERVICE_TIMEOUT,
+                message="일기 생성 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.",
+                details={}
             )
         except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"AI service error: {e.response.text}"
+            logger.error(f"AI service HTTP error: {e.response.status_code} - {e.response.text}")
+            raise ServiceError(
+                error_code=ErrorCode.AI_SERVICE_ERROR,
+                message="일기 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                details={"status_code": e.response.status_code}
             )
         except httpx.RequestError as e:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"AI service unavailable: {str(e)}"
+            logger.error(f"AI service request error: {str(e)}")
+            raise ServiceError(
+                error_code=ErrorCode.AI_SERVICE_UNAVAILABLE,
+                message="AI 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+                details={}
             )
 
-    async def _generate_mood_analysis(self, diary_content: str) -> str:
-        """Generate mood analysis from diary content"""
+    async def _generate_mood_analysis(self, user_id: int, diary_content: str) -> str:
+        """Generate mood analysis from diary content (사용자별 최적 모델)"""
         prompt = create_mood_analysis_prompt(diary_content)
 
         try:
-            result = await call_ai_service(
+            result = await call_ai_for_user(
+                user_id=user_id,
                 prompt=prompt,
-                provider="claude",
+                db=self.db,
                 max_tokens=50,
                 temperature=0.3,
                 timeout=15.0
@@ -272,14 +283,15 @@ class DiaryService:
             logger.error(f"Mood analysis error: {e}", exc_info=True)
             return "중립"  # Default fallback
 
-    async def _generate_summary(self, diary_content: str) -> str:
-        """Generate summary from diary content"""
+    async def _generate_summary(self, user_id: int, diary_content: str) -> str:
+        """Generate summary from diary content (사용자별 최적 모델)"""
         prompt = create_summary_prompt(diary_content)
 
         try:
-            result = await call_ai_service(
+            result = await call_ai_for_user(
+                user_id=user_id,
                 prompt=prompt,
-                provider="claude",
+                db=self.db,
                 max_tokens=200,
                 temperature=0.5,
                 timeout=15.0

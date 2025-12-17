@@ -1,43 +1,15 @@
-# FastAPI Framework
-fastapi==0.115.6
-
-# ASGI Server
-uvicorn[standard]==0.34.0
-
-# HTTP Client for API calls
-httpx==0.28.1
-
-# Environment Variables
-python-dotenv==1.0.1
-
-# Settings Management
-pydantic-settings==2.7.0
-
-# Data Validation
-pydantic==2.10.4
-
-# Template Engine (for Web UI)
-jinja2==3.1.4
-
-# Testing
-pytest==8.3.4
-pytest-asyncio==0.24.0
-
-# Database ORM
-sqlalchemy==2.0.36
-
-# Async SQLite Driver
-aiosqlite==0.20.0
-
-# Greenlet for async SQLAlchemy
-greenlet==3.1.1
-
-# Password Hashing
-bcrypt==4.0.1
-passlib[bcrypt]==1.7.4
-
-# JWT Token Handling
-python-jose[cryptography]==3.3.0
-
-# Email Validation
-email-validator==2.2.0
+fastapi
+uvicorn
+sqlalchemy
+asyncpg
+aiosqlite
+jinja2
+python-multipart
+pyjwt
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic-settings
+httpx
+aiohttp
+limitermiddleware
+alembic # Added for database migrations
