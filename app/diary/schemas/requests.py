@@ -1,6 +1,7 @@
 """Diary request schemas"""
 
 from datetime import date, datetime
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -12,9 +13,9 @@ class StartConversationRequest(BaseModel):
         default="America/Los_Angeles",
         description="User's timezone (IANA timezone format, e.g., 'America/Los_Angeles', 'Asia/Seoul')"
     )
-    current_time: datetime = Field(
-        ...,
-        description="Client's current local time (ISO 8601 format with timezone)"
+    current_time: Optional[datetime] = Field(
+        default=None,
+        description="Client's current local time (ISO 8601 format with timezone). If not provided, server time will be used."
     )
 
     class Config:
