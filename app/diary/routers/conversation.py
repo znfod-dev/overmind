@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/conversations", tags=["conversations"])
     response_model=ConversationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Start new conversation",
-    description="Start a new diary conversation session"
+    description="Start a new diary conversation session with AI-generated greeting"
 )
 async def start_conversation(
     request: StartConversationRequest,
@@ -31,14 +31,16 @@ async def start_conversation(
     """
     Start a new diary conversation
 
+    - AI generates contextual greeting based on time and date
+    - Timezone and current time provided by client
     - One active conversation per user per date
-    - AI starts with greeting message
     """
     service = ConversationService(db)
     conversation, initial_message = await service.start_conversation(
         user_id=current_user.id,
         entry_date=request.entry_date,
-        initial_message=request.initial_message
+        timezone=request.timezone,
+        current_time=request.current_time
     )
 
     # Reload with messages

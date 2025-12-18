@@ -2,15 +2,20 @@
 
 from typing import Optional
 import httpx
+import logging
 from datetime import datetime, date
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status
 
 from app.config import settings
 from app.core.ai_helper import call_ai_for_user
+from app.core.exceptions import BadRequestError, ErrorCode
 from app.models import Conversation, Message, Profile, ConversationStatus, MessageRole
-from app.diary.services.prompts import create_conversation_prompt
+from app.diary.services.prompts import create_conversation_prompt, create_initial_greeting_prompt
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationService:
@@ -25,19 +30,70 @@ class ConversationService:
         self,
         user_id: int,
         entry_date: date,
-        initial_message: str = "오늘 하루 어떠셨어요?"
+        timezone: str = "America/Los_Angeles",
+        current_time: Optional[datetime] = None
     ) -> tuple[Conversation, Message]:
         """
-        Start a new diary conversation
+        Start a new diary conversation with AI-generated greeting
 
         Args:
             user_id: User ID
             entry_date: Date for this diary entry
-            initial_message: AI's first message
+            timezone: User's timezone (IANA format)
+            current_time: Client's current local time (timezone-aware)
 
         Returns:
             Tuple of (Conversation, initial Message)
+
+        Raises:
+            BadRequestError: If entry_date is in the future
         """
+        # Validate timezone (fallback to America/Los_Angeles if invalid)
+        try:
+            tz = ZoneInfo(timezone)
+        except ZoneInfoNotFoundError:
+            logger.warning(f"Invalid timezone: {timezone}, falling back to America/Los_Angeles")
+            timezone = "America/Los_Angeles"
+            tz = ZoneInfo(timezone)
+
+        # Use client's current time (or fallback to server time)
+        if current_time is None:
+            current_time = datetime.now(tz)
+
+        # Ensure current_time is timezone-aware
+        if current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=tz)
+
+        # Validate entry date (no future dates)
+        today = current_time.date()
+        if entry_date > today:
+            raise BadRequestError(
+                error_code=ErrorCode.FUTURE_DIARY_NOT_ALLOWED,
+                message="미래 날짜의 일기는 작성할 수 없습니다.",
+                details={
+                    "entry_date": entry_date.isoformat(),
+                    "today": today.isoformat()
+                }
+            )
+
+        # Generate AI greeting
+        prompt = create_initial_greeting_prompt(entry_date, current_time)
+
+        try:
+            result = await call_ai_for_user(
+                user_id=user_id,
+                prompt=prompt,
+                db=self.db,
+                max_tokens=150,  # Short greeting
+                temperature=0.9,  # More creative
+                timeout=15.0
+            )
+            initial_message = result["text"].strip()
+        except Exception as e:
+            # Fallback to default if AI fails
+            logger.error(f"Failed to generate greeting: {e}", exc_info=True)
+            initial_message = "안녕하세요! 오늘 하루는 어떠셨나요?"
+
         # Create conversation
         conversation = Conversation(
             user_id=user_id,

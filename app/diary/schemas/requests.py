@@ -1,6 +1,6 @@
 """Diary request schemas"""
 
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 
@@ -8,16 +8,21 @@ class StartConversationRequest(BaseModel):
     """Start a new diary conversation"""
 
     entry_date: date = Field(..., description="Date for this diary entry")
-    initial_message: str = Field(
-        default="오늘 하루 어떠셨어요?",
-        description="Initial AI message to start conversation"
+    timezone: str = Field(
+        default="America/Los_Angeles",
+        description="User's timezone (IANA timezone format, e.g., 'America/Los_Angeles', 'Asia/Seoul')"
+    )
+    current_time: datetime = Field(
+        ...,
+        description="Client's current local time (ISO 8601 format with timezone)"
     )
 
     class Config:
         json_schema_extra = {
             "example": {
-                "entry_date": "2025-12-11",
-                "initial_message": "오늘 하루 어떠셨어요?"
+                "entry_date": "2025-12-18",
+                "timezone": "America/Los_Angeles",
+                "current_time": "2025-12-18T09:30:00-08:00"
             }
         }
 

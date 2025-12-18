@@ -179,3 +179,72 @@ def create_summary_prompt(diary_content: str) -> str:
 요약:"""
 
     return prompt
+
+
+def create_initial_greeting_prompt(entry_date: date, current_time: datetime) -> str:
+    """
+    Create prompt for AI to generate contextual initial greeting
+
+    AI generates a greeting based on:
+    - Time of day (morning/afternoon/evening)
+    - Entry date context (today/yesterday/past)
+
+    Args:
+        entry_date: Date for the diary entry
+        current_time: Client's current local time (timezone-aware)
+
+    Returns:
+        Formatted prompt for greeting generation
+    """
+    # Determine time of day
+    hour = current_time.hour
+    if 5 <= hour < 12:
+        time_of_day = "아침"
+        time_context = "아침이 시작되었고"
+    elif 12 <= hour < 18:
+        time_of_day = "점심"
+        time_context = "점심 시간이 지나가고 있고"
+    else:
+        time_of_day = "저녁"
+        time_context = "하루가 저물어가고 있고"
+
+    # Determine date context
+    today = current_time.date()
+    days_diff = (today - entry_date).days
+
+    if entry_date == today:
+        date_context = "오늘"
+        date_instruction = "오늘 하루에 대해 물어보세요"
+    elif days_diff == 1:
+        date_context = "어제"
+        date_instruction = "어제 하루에 대해 물어보세요"
+    elif days_diff == 2:
+        date_context = "그저께"
+        date_instruction = "그저께 하루에 대해 물어보세요"
+    elif days_diff <= 7:
+        date_context = f"{entry_date.month}월 {entry_date.day}일"
+        date_instruction = f"{date_context}의 하루에 대해 물어보세요"
+    else:
+        date_context = f"{entry_date.month}월 {entry_date.day}일"
+        date_instruction = f"{date_context}을 기억해보며 그날의 일들에 대해 물어보세요"
+
+    prompt = f"""당신은 친근하고 공감을 잘하는 일기 도우미 AI입니다.
+
+현재 상황:
+- 시간대: {time_of_day} ({time_context})
+- 일기 날짜: {date_context}
+
+사용자와 대화를 시작하기 위한 자연스러운 인사말을 생성해주세요.
+시간대와 날짜를 고려하여, 짧은 인사말과 함께 {date_instruction}.
+
+요구사항:
+- 1-2개의 질문만 포함
+- 자연스럽고 친근한 톤
+- 응답만 출력하고, 다른 설명은 하지 마세요
+
+출력 예시:
+"안녕하세요! 오늘 하루는 어떠셨나요?"
+
+인사말:"""
+
+    return prompt
