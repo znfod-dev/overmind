@@ -90,9 +90,21 @@ class ConversationService:
             )
             initial_message = result["text"].strip()
         except Exception as e:
-            # Fallback to default if AI fails
+            # Fallback to context-aware default if AI fails
             logger.error(f"Failed to generate greeting: {e}", exc_info=True)
-            initial_message = "안녕하세요! 오늘 하루는 어떠셨나요?"
+
+            # Generate fallback message based on date
+            days_diff = (today - entry_date).days
+            if entry_date == today:
+                initial_message = "안녕하세요! 오늘 하루는 어떠셨나요?"
+            elif days_diff == 1:
+                initial_message = "안녕하세요! 어제는 어떤 하루를 보내셨나요?"
+            elif days_diff == 2:
+                initial_message = "안녕하세요! 그저께는 어떤 일들이 있으셨나요?"
+            elif days_diff <= 7:
+                initial_message = f"안녕하세요! {entry_date.month}월 {entry_date.day}일에는 어떤 하루를 보내셨나요?"
+            else:
+                initial_message = f"안녕하세요! {entry_date.month}월 {entry_date.day}일을 기억해보시면, 어떤 일들이 있으셨나요?"
 
         # Create conversation
         conversation = Conversation(
