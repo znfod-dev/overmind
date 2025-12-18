@@ -4,18 +4,33 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 from pathlib import Path
 
-# Database file location
-DATABASE_DIR = Path(__file__).parent.parent.parent / "data"
-DATABASE_DIR.mkdir(exist_ok=True)
-DATABASE_FILE = DATABASE_DIR / "overmind.db"
-DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_FILE}"
+from app.config import settings
+
+# Get database URL from environment variables
+DATABASE_URL = settings.database_url
+
+# For SQLite, ensure data directory exists
+if DATABASE_URL.startswith("sqlite"):
+    DATABASE_DIR = Path(__file__).parent.parent.parent / "data"
+    DATABASE_DIR.mkdir(exist_ok=True)
+
+# Create async engine with appropriate settings for each database type
+engine_kwargs = {
+    "echo": settings.database_echo,
+    "future": True,
+}
+
+# PostgreSQL specific settings
+if DATABASE_URL.startswith("postgresql"):
+    engine_kwargs.update({
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_pre_ping": True,  # Verify connections before using
+        "pool_recycle": 3600,   # Recycle connections after 1 hour
+    })
 
 # Create async engine
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,  # Set True for SQL logging in development
-    future=True,
-)
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(

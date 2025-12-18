@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 10080  # 7 days (for development)
 
     # Database Configuration
+    database_url: str = "sqlite+aiosqlite:///./data/overmind.db"  # Default to SQLite
     database_echo: bool = False  # Set to True for SQL logging
 
     model_config = SettingsConfigDict(

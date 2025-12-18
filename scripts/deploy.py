@@ -13,6 +13,11 @@ PROJECT_ID = "gen-lang-client-0151610785"  # 여기에 GCP 프로젝트 ID 입�
 REGION = "asia-northeast3"  # 서울 리전
 SERVICE_NAME = "overmind-ai-gateway"
 
+# Cloud SQL 설정 (PostgreSQL 사용 시)
+CLOUD_SQL_INSTANCE = "overmind-db"  # Cloud SQL 인스턴스 이름
+CLOUD_SQL_CONNECTION = f"{PROJECT_ID}:{REGION}:{CLOUD_SQL_INSTANCE}"  # 자동 생성
+USE_CLOUD_SQL = True  # Cloud SQL 사용 여부 (False면 SQLite 사용)
+
 # 색상 코드
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
@@ -189,6 +194,12 @@ def deploy():
     print_info("Cloud Build가 자동으로 이미지를 빌드합니다...")
     print_info("이 작업은 5-10분 소요될 수 있습니다...")
 
+    # Cloud SQL 연결 설정
+    cloudsql_flag = ""
+    if USE_CLOUD_SQL:
+        cloudsql_flag = f"--add-cloudsql-instances={CLOUD_SQL_CONNECTION}"
+        print_info(f"Cloud SQL 연결: {CLOUD_SQL_CONNECTION}")
+
     # --source 방식: gcloud가 자동으로 빌드
     deploy_cmd = f"""gcloud run deploy {SERVICE_NAME} \\
   --source . \\
@@ -196,6 +207,7 @@ def deploy():
   --region {REGION} \\
   --allow-unauthenticated \\
   --env-vars-file .env.yaml \\
+  {cloudsql_flag} \\
   --timeout 300 \\
   --memory 512Mi \\
   --cpu 1 \\
