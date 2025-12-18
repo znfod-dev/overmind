@@ -1,7 +1,7 @@
 """AI prompt templates for diary service"""
 
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime
 
 
 def create_conversation_prompt(
