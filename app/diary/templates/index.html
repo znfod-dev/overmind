@@ -296,10 +296,8 @@
         // Load diaries for current month
         async function loadDiariesForMonth() {
             try {
-                // 해당 월의 시작일과 종료일
                 const startDate = new Date(currentYear, currentMonth, 1);
                 const endDate = new Date(currentYear, currentMonth + 1, 0);
-
                 const startStr = toLocalISODate(startDate);
                 const endStr = toLocalISODate(endDate);
 
@@ -319,10 +317,19 @@
             }
         }
 
-        // Render calendar
-        async function renderCalendar() {
+        // 새로운 함수: 일기 마커를 비동기적으로 업데이트
+        async function updateDiaryMarkers() {
             await loadDiariesForMonth();
+            diariesWithEntries.forEach(dateStr => {
+                const dayElement = document.querySelector(`.calendar-day[data-date="${dateStr}"]`);
+                if (dayElement) {
+                    dayElement.classList.add('has-diary');
+                }
+            });
+        }
 
+        // Render calendar
+        function renderCalendar() {
             const firstDay = new Date(currentYear, currentMonth, 1);
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
             const prevLastDay = new Date(currentYear, currentMonth, 0);
@@ -331,7 +338,6 @@
             const lastDate = lastDay.getDate();
             const prevLastDate = prevLastDay.getDate();
 
-            // Update title
             document.getElementById('calendarTitle').textContent =
                 `${currentYear}년 ${currentMonth + 1}월`;
 
@@ -350,20 +356,11 @@
                 const dateStr = toLocalISODate(date);
 
                 let classes = 'calendar-day';
+                if (date.toDateString() === today.toDateString()) classes += ' today';
+                if (date.toDateString() === selectedDate.toDateString()) classes += ' selected';
 
-                if (date.toDateString() === today.toDateString()) {
-                    classes += ' today';
-                }
-
-                if (date.toDateString() === selectedDate.toDateString()) {
-                    classes += ' selected';
-                }
-
-                if (diariesWithEntries.has(dateStr)) {
-                    classes += ' has-diary';
-                }
-
-                days += `<div class="${classes}" onclick="selectDate(${i})">${i}</div>`;
+                // data-date 속성 추가
+                days += `<div class="${classes}" data-date="${dateStr}" onclick="selectDate(${i})">${i}</div>`;
             }
 
             // Next month days
@@ -373,6 +370,9 @@
             }
 
             document.getElementById('calendarDays').innerHTML = days;
+
+            // 렌더링 후 마커 업데이트
+            updateDiaryMarkers();
         }
 
         // Select date
@@ -498,7 +498,8 @@
         // Initialize
         loadUserInfo();
         renderCalendar();
-        loadDiaryForDate();
+        // 초기 로드 시 오늘 날짜 일기 자동 로딩 제거
+        // loadDiaryForDate();
     </script>
 </body>
 </html>

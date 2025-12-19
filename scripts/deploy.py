@@ -14,7 +14,7 @@ REGION = "asia-northeast3"  # 서울 리전
 SERVICE_NAME = "overmind-ai-gateway"
 
 # Cloud SQL 설정 (PostgreSQL 사용 시)
-CLOUD_SQL_INSTANCE = "overmind-db"  # Cloud SQL 인스턴스 이름
+CLOUD_SQL_INSTANCE = "overmind-nana-20251218"  # Cloud SQL 인스턴스 이름
 CLOUD_SQL_CONNECTION = f"{PROJECT_ID}:{REGION}:{CLOUD_SQL_INSTANCE}"  # 자동 생성
 USE_CLOUD_SQL = True  # Cloud SQL 사용 여부 (False면 SQLite 사용)
 
@@ -178,6 +178,21 @@ def create_env_yaml(env_vars):
         deploy_env_vars["INTERNAL_API_KEY"] = "internal-service-key-overmind-2025"
         print_info("INTERNAL_API_KEY 자동 생성")
 
+    # Cloud SQL 사용 시, DATABASE_URL 강제 설정
+    if USE_CLOUD_SQL:
+        db_socket_dir = "/cloudsql"
+        db_user = deploy_env_vars.get("DB_USER", "overmind-user")
+        db_pass = deploy_env_vars.get("DB_PASS", "Qkrwhdgus-nana-20251205")
+        db_name = deploy_env_vars.get("DB_NAME", "overmind")
+
+        cloud_sql_db_url = (
+            f"postgresql+asyncpg://{db_user}:{db_pass}@/{db_name}"
+            f"?host={db_socket_dir}/{CLOUD_SQL_CONNECTION}"
+        )
+        deploy_env_vars["DATABASE_URL"] = cloud_sql_db_url
+        print_info(f"Cloud SQL DATABASE_URL 설정: {cloud_sql_db_url}")
+
+
     with open(env_yaml_path, "w") as f:
         for key, value in deploy_env_vars.items():
             # 모든 값을 문자열로 처리 (YAML 파싱 문제 방지)
@@ -212,10 +227,22 @@ def deploy():
   --memory 512Mi \\
   --cpu 1 \\
   --min-instances 0 \\
-  --max-instances 10
+  --max-instances 10 \\
+  --verbosity=debug
 """
 
-    run_command(deploy_cmd, "배포 실패")
+    print_info("실시간 배포 로그를 스트리밍합니다...")
+    try:
+        # 실시간 로그 출력을 위해 capture_output=False (기본값) 사용
+        subprocess.run(
+            deploy_cmd,
+            shell=True,
+            check=True,
+            text=True
+        )
+    except subprocess.CalledProcessError:
+        # gcloud 명령어 자체의 에러는 이미 터미널에 출력됨
+        print_error("배포 실패. 위 로그를 확인하세요.")
 
 
 def get_service_url():

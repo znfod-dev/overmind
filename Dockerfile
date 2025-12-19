@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM python:3.11-slim as builder
+FROM python:3.13-slim as builder
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Runtime
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
@@ -19,8 +19,8 @@ COPY --from=builder /root/.local /root/.local
 COPY app ./app
 COPY scripts/start.py ./start.py
 
-# 로그 디렉토리 생성
-RUN mkdir -p logs
+# 로그 및 스토리지 디렉토리 생성
+RUN mkdir -p logs storage
 
 # PATH 설정
 ENV PATH=/root/.local/bin:$PATH
