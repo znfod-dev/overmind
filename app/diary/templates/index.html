@@ -62,8 +62,18 @@
             margin: 0 auto;
             padding: 20px;
             display: grid;
-            grid-template-columns: 400px 1fr;
+            grid-template-columns: 1fr;
             gap: 30px;
+        }
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 350px 1fr;
+            }
+        }
+        @media (min-width: 1024px) {
+            .container {
+                grid-template-columns: 400px 1fr;
+            }
         }
         .calendar-section {
             background: white;

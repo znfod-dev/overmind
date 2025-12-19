@@ -65,10 +65,14 @@ class AIModelSelector:
                     AIModelPriority.tier == tier
                 )
             )
-            priority = result.scalar_one()
+            priority = result.scalar_one_or_none()
 
-        # 5. 1순위 모델 선택 (향후 실패 시 2, 3순위로 폴백 가능)
-        provider = priority.priority_1
+        # 5. 1순위 모델 선택 (DB에 데이터가 없으면 하드코딩된 기본값 사용)
+        if priority:
+            provider = priority.priority_1
+        else:
+            # DB에 우선순위 설정이 전혀 없을 경우: WW basic 기본값 (openai)
+            provider = "openai"
 
         # 6. Provider별 기본 모델 매핑
         model_map = {
