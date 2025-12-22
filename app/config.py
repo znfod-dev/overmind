@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # Database Configuration
     database_url: str = "sqlite+aiosqlite:///./data/overmind.db"  # Default to SQLite
+    cloud_sql_connection_name: str | None = None
     database_echo: bool = False  # Set to True for SQL logging
 
     model_config = SettingsConfigDict(

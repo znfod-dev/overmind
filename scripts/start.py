@@ -4,6 +4,9 @@
 import os
 import sys
 import multiprocessing
+import subprocess
+import signal
+import time
 from pathlib import Path
 import uvicorn
 
@@ -13,6 +16,9 @@ sys.path.insert(0, str(project_root))
 
 # 작업 디렉토리를 프로젝트 루트로 변경
 os.chdir(project_root)
+
+# Cloud SQL Proxy 프로세스를 전역으로 관리
+cloud_sql_proxy_process = None
 
 
 def detect_environment() -> str:
@@ -29,21 +35,85 @@ def get_workers() -> int:
     return min(cpu_count * 2 + 1, 4)
 
 
+def cleanup_proxy(signum=None, frame=None):
+    """Cloud SQL Proxy 종료"""
+    global cloud_sql_proxy_process
+    if cloud_sql_proxy_process:
+        print("\n🛑 Stopping Cloud SQL Proxy...")
+        cloud_sql_proxy_process.terminate()
+        try:
+            cloud_sql_proxy_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            cloud_sql_proxy_process.kill()
+        print("✅ Cloud SQL Proxy stopped")
+    sys.exit(0)
+
+
+def start_cloud_sql_proxy():
+    """Cloud SQL Proxy 시작"""
+    global cloud_sql_proxy_process
+
+    instance_connection = "gen-lang-client-0151610785:asia-northeast3:overmind-nana-20251218"
+
+    print(f"🔌 Starting Cloud SQL Proxy for {instance_connection}...")
+
+    try:
+        cloud_sql_proxy_process = subprocess.Popen(
+            ["cloud-sql-proxy", instance_connection],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        # 프록시가 준비될 때까지 대기 (약 2-3초)
+        print("⏳ Waiting for Cloud SQL Proxy to be ready...")
+        time.sleep(3)
+
+        # 프로세스가 여전히 실행 중인지 확인
+        if cloud_sql_proxy_process.poll() is not None:
+            raise Exception("Cloud SQL Proxy failed to start")
+
+        print("✅ Cloud SQL Proxy is ready")
+        return True
+
+    except FileNotFoundError:
+        print("❌ Error: cloud-sql-proxy not found. Please install it first.")
+        print("   Install: brew install cloud-sql-proxy")
+        return False
+    except Exception as e:
+        print(f"❌ Error starting Cloud SQL Proxy: {e}")
+        return False
+
+
 def main():
     env = detect_environment()
     port = int(os.getenv("PORT", "8000"))
 
     if env == "local":
-        print(f"🚀 Starting server in LOCAL mode on port {port}")
+        # Ctrl+C 시그널 핸들러 등록
+        signal.signal(signal.SIGINT, cleanup_proxy)
+        signal.signal(signal.SIGTERM, cleanup_proxy)
+
+        # Cloud SQL Proxy 시작
+        if not start_cloud_sql_proxy():
+            print("❌ Failed to start Cloud SQL Proxy. Exiting...")
+            sys.exit(1)
+
+        print(f"\n🚀 Starting server in LOCAL mode on port {port}")
         print(f"📍 Access: http://localhost:{port}")
         print(f"📖 API Docs: http://localhost:{port}/docs")
-        uvicorn.run(
-            "app.main:app",
-            host="0.0.0.0",
-            port=port,
-            reload=True,
-            log_level="info"
-        )
+        print(f"💡 Press Ctrl+C to stop both server and proxy\n")
+
+        try:
+            uvicorn.run(
+                "app.main:app",
+                host="0.0.0.0",
+                port=port,
+                reload=True,
+                log_level="info"
+            )
+        except KeyboardInterrupt:
+            cleanup_proxy()
     else:
         print(f"🚀 Starting server in PRODUCTION mode on port {port}")
         # Cloud Run은 인스턴스 수를 자동 관리하므로 workers=1
