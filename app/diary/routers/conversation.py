@@ -1,7 +1,8 @@
 """Conversation management endpoints"""
 
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -10,8 +11,9 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import User, Conversation, Message
 from app.diary.schemas.requests import StartConversationRequest, SendMessageRequest
-from app.diary.schemas.responses import ConversationResponse, AIMessageResponse, MessageResponse
+from app.diary.schemas.responses import ConversationResponse, AIMessageResponse, MessageResponse, ConversationQualityInfo
 from app.diary.services.conversation import ConversationService
+from app.core.storage import image_storage
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
@@ -101,21 +103,51 @@ async def send_message(
     """
     Send message to conversation
 
-    - Saves user message
+    - Accepts JSON with content field
     - Calls AI service for response
-    - Returns AI response
+    - Returns AI response with quality info
     """
+    message_content = request.content
+
+    # No image handling for now - JSON only
+    image_url = None
+
+    # Send message with optional image URL
+    print(f"💬 [Router] Received message: conv_id={conversation_id}, user={current_user.id}, content_len={len(message_content)}")
+
     service = ConversationService(db)
-    ai_message = await service.send_message(
-        conversation_id=conversation_id,
-        user_id=current_user.id,
-        content=request.content
-    )
+    try:
+        ai_message = await service.send_message(
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+            content=message_content,
+            image_url=image_url
+        )
+        print(f"✅ [Router] AI message received: msg_id={ai_message.id}")
+    except Exception as e:
+        print(f"❌ [Router] Error in send_message: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+    # Build quality info from attached quality data
+    quality_info = None
+    if hasattr(ai_message, 'quality_info') and ai_message.quality_info:
+        quality = ai_message.quality_info
+        quality_info = ConversationQualityInfo(
+            is_sufficient=quality.is_sufficient,
+            quality_level=quality.quality_level.value,
+            user_message_count=quality.user_message_count,
+            total_user_content_length=quality.total_user_content_length,
+            avg_user_message_length=quality.avg_user_message_length,
+            feedback_message=quality.feedback_message
+        )
 
     return AIMessageResponse(
         message_id=ai_message.id,
         content=ai_message.content,
-        created_at=ai_message.created_at
+        created_at=ai_message.created_at,
+        quality_info=quality_info
     )
 
 

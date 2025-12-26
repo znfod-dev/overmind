@@ -53,6 +53,7 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(Enum(MessageRole), nullable=False)
     content = Column(Text, nullable=False)
+    image_url = Column(String(500), nullable=True)  # URL or path to image attachment
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationship

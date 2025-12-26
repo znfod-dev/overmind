@@ -9,8 +9,8 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import User
 from app.core.exceptions import BadRequestError, ErrorCode
-from app.diary.schemas.requests import GenerateDiaryRequest
-from app.diary.schemas.responses import DiaryEntryResponse, DiaryListResponse
+from app.diary.schemas.requests import GenerateDiaryRequest, CreateDiaryRequest, ReviewDiaryRequest
+from app.diary.schemas.responses import DiaryEntryResponse, DiaryListResponse, DiaryReviewResponse
 from app.diary.services.diary import DiaryService
 
 router = APIRouter(prefix="/api/diaries", tags=["diaries"])
@@ -158,3 +158,64 @@ async def delete_diary(
     """
     service = DiaryService(db)
     await service.delete_diary(diary_id, current_user.id)
+
+
+@router.post(
+    "/manual",
+    response_model=DiaryEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create diary manually",
+    description="Create a diary entry without conversation (user writes directly)"
+)
+async def create_manual_diary(
+    request: CreateDiaryRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> DiaryEntryResponse:
+    """
+    Create diary entry manually
+
+    - User writes diary directly (no conversation needed)
+    - AI generates mood analysis and summary
+    - One diary per date per user
+    """
+    service = DiaryService(db)
+    diary = await service.create_manual_diary(
+        user_id=current_user.id,
+        entry_date=request.entry_date,
+        title=request.title,
+        content=request.content
+    )
+
+    return DiaryEntryResponse.model_validate(diary)
+
+
+@router.post(
+    "/review",
+    response_model=DiaryReviewResponse,
+    summary="Review diary with AI",
+    description="Get AI review and suggestions for diary content"
+)
+async def review_diary(
+    request: ReviewDiaryRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> DiaryReviewResponse:
+    """
+    Get AI review for diary content
+
+    - Spell checking and grammar
+    - Writing style suggestions
+    - Mood analysis
+    - Improved version of the content
+
+    Use this before saving the diary to get feedback and improvements.
+    """
+    service = DiaryService(db)
+    review_data = await service.review_diary(
+        user_id=current_user.id,
+        title=request.title,
+        content=request.content
+    )
+
+    return DiaryReviewResponse(**review_data)

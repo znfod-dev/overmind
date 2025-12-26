@@ -1,13 +1,14 @@
 """AI prompt templates for diary service"""
 
-from typing import Optional
+from typing import Optional, Any
 from datetime import date, datetime
 
 
 def create_conversation_prompt(
     user_message: str,
     conversation_history: list[dict],
-    profile: Optional[dict] = None
+    profile: Optional[dict] = None,
+    quality: Optional[Any] = None
 ) -> str:
     """
     Create AI prompt for diary conversation
@@ -16,6 +17,7 @@ def create_conversation_prompt(
         user_message: Latest user message
         conversation_history: Previous messages [{"role": "ai"|"user", "content": str}]
         profile: User profile data (nickname, job, hobbies, etc.)
+        quality: ConversationQuality object with metrics (optional)
 
     Returns:
         Formatted prompt for AI
@@ -47,6 +49,39 @@ def create_conversation_prompt(
             history_parts.append(f"{role}: {msg['content']}")
         history_text = "\n\n이전 대화:\n" + "\n".join(history_parts)
 
+    # NEW: Build quality-aware guidance
+    quality_guidance = ""
+    if quality:
+        if quality.quality_level.value == "insufficient":
+            quality_guidance = """
+
+대화 품질 상태: 현재 대화가 일기를 만들기에 부족합니다.
+사용자가 더 많이 이야기할 수 있도록 적극적으로 도와주세요:
+- 구체적인 세부 사항을 묻는 열린 질문하기
+- 감정이나 느낌에 대해 질문하기
+- "어떤 점이 특히 기억에 남나요?" 같은 심화 질문하기
+- 짧은 답변("응", "네")에는 더 구체적인 후속 질문으로 이어가기
+
+중요: 질문은 자연스럽고 친근하게, 부담스럽지 않게 하세요."""
+
+        elif quality.quality_level.value == "minimal":
+            quality_guidance = """
+
+대화 품질 상태: 일기를 만들 수 있지만 조금 더 풍부하면 좋습니다.
+자연스럽게 1-2개의 후속 질문을 이어가세요."""
+
+        elif quality.quality_level.value == "good":
+            quality_guidance = """
+
+대화 품질 상태: 충분한 내용이 모였습니다.
+사용자가 더 이야기하고 싶은지 확인하거나, 자연스럽게 마무리해도 좋습니다."""
+
+        elif quality.quality_level.value == "excellent":
+            quality_guidance = """
+
+대화 품질 상태: 풍부한 내용이 모였습니다!
+사용자가 더 이야기하고 싶어하는 경우에만 질문하고, 아니면 자연스럽게 마무리하세요."""
+
     prompt = f"""당신은 친근하고 공감을 잘하는 일기 도우미 AI입니다.
 사용자와 대화하면서 하루 일과를 자연스럽게 수집하고, 적절한 공감과 꼬리 질문을 통해 대화를 이어갑니다.
 
@@ -61,7 +96,7 @@ def create_conversation_prompt(
 - "오늘 하루 어떠셨어요?"
 - "점심은 뭐 드셨어요?"
 - "그랬구나! 기분이 어떠셨어요?"
-- "더 얘기하고 싶은 게 있으세요?"{profile_context}{history_text}
+- "더 얘기하고 싶은 게 있으세요?"{profile_context}{history_text}{quality_guidance}
 
 사용자의 최신 메시지:
 {user_message}
@@ -246,5 +281,60 @@ def create_initial_greeting_prompt(entry_date: date, current_time: datetime) -> 
 "안녕하세요! 오늘 하루는 어떠셨나요?"
 
 인사말:"""
+
+    return prompt
+
+
+def create_diary_review_prompt(title: str, content: str) -> str:
+    """
+    Create prompt for AI to review and provide feedback on user-written diary
+
+    Args:
+        title: Diary title
+        content: Diary content written by user
+
+    Returns:
+        Formatted prompt for diary review
+    """
+    prompt = f"""당신은 친절하고 전문적인 일기 검수 AI입니다.
+사용자가 작성한 일기를 검토하고, 건설적인 피드백을 제공합니다.
+
+일기 제목: {title}
+
+일기 내용:
+{content}
+
+다음 형식으로 JSON 응답을 작성해주세요:
+
+{{
+  "overall_feedback": "전반적인 피드백 (2-3문장)",
+  "mood": "감정 상태 (positive/negative/neutral/mixed 중 하나)",
+  "suggestions": [
+    {{
+      "type": "맞춤법/문법/스타일/명확성 중 하나",
+      "original": "원본 텍스트",
+      "suggested": "제안하는 수정본",
+      "reason": "수정 이유"
+    }}
+  ],
+  "improved_content": "AI가 개선한 전체 일기 내용 (선택사항)"
+}}
+
+검수 기준:
+1. 맞춤법 및 띄어쓰기
+2. 문법적 정확성
+3. 문장 구조 및 흐름
+4. 감정 표현의 풍부함
+5. 문체의 일관성
+6. 명확성과 가독성
+
+주의사항:
+- 사용자의 개성과 표현 스타일을 존중
+- 과도한 수정 지양
+- 명확한 오류만 지적
+- 건설적이고 긍정적인 톤 유지
+- 개선된 내용은 원본의 의도를 유지하면서 자연스럽게 작성
+
+JSON 형식으로만 응답하고, 다른 텍스트는 포함하지 마세요."""
 
     return prompt

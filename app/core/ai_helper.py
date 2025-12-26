@@ -53,6 +53,8 @@ async def call_ai_service(
     """
     client = get_http_client()
 
+    print(f"📤 [AI] Calling {provider}/{model}, prompt length: {len(prompt)}, max_tokens: {max_tokens}")
+
     try:
         response = await client.post(
             f"{settings.ai_service_url}/ai/api/req",
@@ -71,15 +73,20 @@ async def call_ai_service(
         )
 
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        print(f"📥 [AI] Response status: {response.status_code}")
+        return result
 
     except httpx.TimeoutException as e:
+        print(f"⏱️  [AI] Timeout after {timeout}s: {e}")
         logger.error(f"AI service timeout after {timeout}s: {e}")
         raise
     except httpx.HTTPStatusError as e:
+        print(f"🚨 [AI] HTTP error {e.response.status_code}: {e.response.text}")
         logger.error(f"AI service HTTP error {e.response.status_code}: {e.response.text}")
         raise
     except httpx.RequestError as e:
+        print(f"🔌 [AI] Request error: {e}")
         logger.error(f"AI service request error: {e}")
         raise
 
@@ -128,13 +135,20 @@ async def call_ai_for_user(
     selector = AIModelSelector(db)
     provider, model = await selector.get_model_for_user(user_id)
 
+    print(f"🤖 [AI] User {user_id} using model: {provider}/{model}")
     logger.info(f"User {user_id} using AI model: {provider}/{model}")
 
-    return await call_ai_service(
-        prompt=prompt,
-        provider=provider,
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        timeout=timeout
-    )
+    try:
+        result = await call_ai_service(
+            prompt=prompt,
+            provider=provider,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout
+        )
+        print(f"✅ [AI] Response received, length: {len(result.get('text', ''))}")
+        return result
+    except Exception as e:
+        print(f"❌ [AI] Error: {type(e).__name__}: {str(e)}")
+        raise

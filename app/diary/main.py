@@ -6,7 +6,7 @@ This module creates a FastAPI sub-application for AI-powered diary conversations
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from app.diary.routers import conversation, diary, web
+from app.diary.routers import conversation, diary, web, images
 
 # Create Diary Sub-App
 diary_app = FastAPI(
@@ -21,6 +21,7 @@ diary_app = FastAPI(
 diary_app.include_router(web.router, tags=["diary-web"])  # Web pages (no prefix)
 diary_app.include_router(conversation.router, tags=["conversations"])
 diary_app.include_router(diary.router, tags=["diaries"])
+diary_app.include_router(images.router, tags=["images"])
 
 
 @diary_app.get(

@@ -32,11 +32,13 @@ class SendMessageRequest(BaseModel):
     """Send a message in conversation"""
 
     content: str = Field(..., min_length=1, max_length=5000, description="Message content")
+    image_url: Optional[str] = Field(None, max_length=500, description="URL or path to attached image")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "content": "오늘은 회사에서 새로운 프로젝트를 시작했어요."
+                "content": "오늘은 회사에서 새로운 프로젝트를 시작했어요.",
+                "image_url": "https://storage.googleapis.com/overmind-images/messages/user_1/20251224_123456_abc123.jpg"
             }
         }
 
@@ -60,5 +62,57 @@ class GenerateDiaryRequest(BaseModel):
             "example": {
                 "length_type": "normal",
                 "title": "새로운 프로젝트 시작"
+            }
+        }
+
+
+class CreateDiaryRequest(BaseModel):
+    """Create diary manually (without conversation)"""
+
+    entry_date: date = Field(..., description="Date for this diary entry")
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Diary title"
+    )
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=50000,
+        description="Diary content"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "entry_date": "2025-12-24",
+                "title": "크리스마스 이브",
+                "content": "오늘은 크리스마스 이브였다. 가족들과 함께 따뜻한 저녁 식사를 했고..."
+            }
+        }
+
+
+class ReviewDiaryRequest(BaseModel):
+    """Request AI review for diary content"""
+
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Diary title"
+    )
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=50000,
+        description="Diary content to review"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "크리스마스 이브",
+                "content": "오늘은 크리스마스 이브였다. 가족들과 함께 따뜻한 저녁 식사를 했고..."
             }
         }

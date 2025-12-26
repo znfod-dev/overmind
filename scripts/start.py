@@ -94,10 +94,15 @@ def main():
         signal.signal(signal.SIGINT, cleanup_proxy)
         signal.signal(signal.SIGTERM, cleanup_proxy)
 
-        # Cloud SQL Proxy 시작
-        if not start_cloud_sql_proxy():
-            print("❌ Failed to start Cloud SQL Proxy. Exiting...")
-            sys.exit(1)
+        # Cloud SQL Proxy 시작 (USE_CLOUD_SQL=true인 경우만)
+        use_cloud_sql = os.getenv("USE_CLOUD_SQL", "false").lower() == "true"
+        if use_cloud_sql:
+            if not start_cloud_sql_proxy():
+                print("❌ Failed to start Cloud SQL Proxy. Exiting...")
+                sys.exit(1)
+        else:
+            print("⚠️  Cloud SQL Proxy disabled (USE_CLOUD_SQL=false)")
+            print("   Using local database or direct connection")
 
         print(f"\n🚀 Starting server in LOCAL mode on port {port}")
         print(f"📍 Access: http://localhost:{port}")

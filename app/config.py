@@ -34,10 +34,20 @@ class Settings(BaseSettings):
     cloud_sql_connection_name: str | None = None
     database_echo: bool = False  # Set to True for SQL logging
 
+    # Google Cloud Storage Configuration
+    gcs_bucket_name: str | None = None  # GCS bucket name for image storage
+    gcs_credentials_path: str | None = None  # Path to GCS service account JSON
+    local_storage_path: str = "./storage/images"  # Fallback local storage path
+
+    # Image Upload Settings
+    max_image_size_mb: int = 5  # Maximum image file size in MB
+    allowed_image_types: list[str] = ["image/jpeg", "image/png", "image/webp", "image/heic"]
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="allow",  # Allow extra fields from .env
     )
 
 

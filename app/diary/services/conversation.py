@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status
+from enum import Enum
+from dataclasses import dataclass
 
 from app.config import settings
 from app.core.ai_helper import call_ai_for_user
@@ -18,6 +20,43 @@ from app.diary.services.prompts import create_conversation_prompt, create_initia
 logger = logging.getLogger(__name__)
 
 
+class QualityLevel(str, Enum):
+    """Conversation quality levels"""
+    INSUFFICIENT = "insufficient"
+    MINIMAL = "minimal"
+    GOOD = "good"
+    EXCELLENT = "excellent"
+
+
+@dataclass
+class ConversationQuality:
+    """Quality metrics for a conversation"""
+    user_message_count: int
+    total_user_content_length: int
+    avg_user_message_length: float
+    has_images: bool
+    quality_level: QualityLevel
+    is_sufficient: bool
+    feedback_message: str
+    required_messages: int
+    required_total_length: int
+    required_avg_length: int
+
+
+class QualityThresholds:
+    """Configurable quality thresholds"""
+    MIN_USER_MESSAGES = 3
+    MIN_TOTAL_USER_CONTENT_LENGTH = 50
+    MIN_AVG_USER_MESSAGE_LENGTH = 10
+    MINIMAL_TOTAL_LENGTH = 100
+    GOOD_MESSAGE_COUNT = 5
+    GOOD_TOTAL_LENGTH = 200
+    EXCELLENT_TOTAL_LENGTH = 300
+    IMAGE_MESSAGE_DISCOUNT = 1
+    SUMMARY_MULTIPLIER = 0.7
+    DETAILED_MULTIPLIER = 1.5
+
+
 class ConversationService:
     """Conversation management service"""
 
@@ -25,6 +64,120 @@ class ConversationService:
         self.db = db
         self.ai_service_url = settings.ai_service_url
         self.internal_api_key = settings.internal_api_key
+
+    async def calculate_conversation_quality(
+        self,
+        conversation_id: int,
+        length_type: str = "normal"
+    ) -> ConversationQuality:
+        """
+        Calculate conversation quality metrics
+
+        Args:
+            conversation_id: ID of conversation to analyze
+            length_type: "summary" | "normal" | "detailed" (affects thresholds)
+
+        Returns:
+            ConversationQuality with metrics and assessment
+        """
+        # Fetch all messages for this conversation
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at)
+        )
+        messages = result.scalars().all()
+
+        # Filter user messages only
+        user_messages = [msg for msg in messages if msg.role == MessageRole.user]
+
+        # Calculate metrics
+        user_message_count = len(user_messages)
+        total_user_content_length = sum(len(msg.content) for msg in user_messages)
+        avg_user_message_length = (
+            total_user_content_length / user_message_count
+            if user_message_count > 0
+            else 0.0
+        )
+        has_images = any(msg.image_url is not None for msg in user_messages)
+
+        # Apply length type multiplier
+        multiplier = {
+            "summary": QualityThresholds.SUMMARY_MULTIPLIER,
+            "normal": 1.0,
+            "detailed": QualityThresholds.DETAILED_MULTIPLIER
+        }.get(length_type, 1.0)
+
+        # Calculate adjusted thresholds
+        required_messages = int(QualityThresholds.MIN_USER_MESSAGES * multiplier)
+        required_total_length = int(QualityThresholds.MIN_TOTAL_USER_CONTENT_LENGTH * multiplier)
+        required_avg_length = int(QualityThresholds.MIN_AVG_USER_MESSAGE_LENGTH * multiplier)
+
+        # Apply image discount (images provide context)
+        if has_images:
+            required_messages = max(1, required_messages - QualityThresholds.IMAGE_MESSAGE_DISCOUNT)
+
+        # Determine if sufficient
+        is_sufficient = (
+            user_message_count >= required_messages and
+            total_user_content_length >= required_total_length and
+            avg_user_message_length >= required_avg_length
+        )
+
+        # Determine quality level
+        if not is_sufficient:
+            quality_level = QualityLevel.INSUFFICIENT
+            feedback_message = self._get_insufficient_feedback(
+                user_message_count,
+                required_messages,
+                total_user_content_length,
+                required_total_length
+            )
+        elif total_user_content_length >= QualityThresholds.EXCELLENT_TOTAL_LENGTH:
+            quality_level = QualityLevel.EXCELLENT
+            feedback_message = "훌륭한 대화입니다! 풍부한 일기를 만들 수 있어요."
+        elif total_user_content_length >= QualityThresholds.GOOD_TOTAL_LENGTH:
+            quality_level = QualityLevel.GOOD
+            feedback_message = "대화가 충분합니다! 일기를 생성할 수 있어요."
+        else:
+            quality_level = QualityLevel.MINIMAL
+            feedback_message = "일기를 만들 수 있지만, 조금 더 이야기하면 더욱 좋아요."
+
+        return ConversationQuality(
+            user_message_count=user_message_count,
+            total_user_content_length=total_user_content_length,
+            avg_user_message_length=round(avg_user_message_length, 1),
+            has_images=has_images,
+            quality_level=quality_level,
+            is_sufficient=is_sufficient,
+            feedback_message=feedback_message,
+            required_messages=required_messages,
+            required_total_length=required_total_length,
+            required_avg_length=required_avg_length
+        )
+
+    def _get_insufficient_feedback(
+        self,
+        current_messages: int,
+        required_messages: int,
+        current_length: int,
+        required_length: int
+    ) -> str:
+        """Generate helpful feedback message for insufficient quality"""
+        issues = []
+
+        if current_messages < required_messages:
+            missing = required_messages - current_messages
+            issues.append(f"{missing}개의 메시지가 더 필요해요")
+
+        if current_length < required_length:
+            # Don't show exact character count, keep it friendly
+            issues.append("조금 더 자세히 이야기해주세요")
+
+        if not issues:
+            return "대화 내용이 좀 더 필요해요."
+
+        return f"{', '.join(issues)}. 더 이야기를 나눠볼까요?"
 
     async def start_conversation(
         self,
@@ -163,7 +316,8 @@ class ConversationService:
         self,
         conversation_id: int,
         user_id: int,
-        content: str
+        content: str,
+        image_url: Optional[str] = None
     ) -> Message:
         """
         Send user message and get AI response
@@ -172,6 +326,7 @@ class ConversationService:
             conversation_id: Conversation ID
             user_id: User ID
             content: User message content
+            image_url: Optional URL or path to attached image
 
         Returns:
             AI response Message
@@ -194,10 +349,18 @@ class ConversationService:
         user_message = Message(
             conversation_id=conversation_id,
             role=MessageRole.user,
-            content=content
+            content=content,
+            image_url=image_url
         )
         self.db.add(user_message)
         await self.db.commit()
+
+        print(f"💾 [Service] User message saved: msg_id={user_message.id}")
+
+        # Calculate conversation quality
+        print(f"🔍 [Service] Calculating quality for conversation {conversation_id}")
+        quality = await self.calculate_conversation_quality(conversation_id)
+        print(f"📊 [Service] Quality: {quality.quality_level.value}, sufficient={quality.is_sufficient}")
 
         # Get conversation history
         history_result = await self.db.execute(
@@ -229,15 +392,18 @@ class ConversationService:
             for msg in messages[:-1]  # Exclude the latest user message
         ]
 
-        # Generate AI response
+        # Generate AI response with quality awareness
+        print(f"🤖 [Service] Calling AI service...")
         ai_response_text = await self._call_ai_service(
             user_id=user_id,
             user_message=content,
             conversation_history=history,
-            profile=profile_dict
+            profile=profile_dict,
+            quality=quality
         )
+        print(f"✅ [Service] AI response received, length={len(ai_response_text)}")
 
-        # Save AI message
+        # Save AI message with quality info attached
         ai_message = Message(
             conversation_id=conversation_id,
             role=MessageRole.ai,
@@ -246,6 +412,9 @@ class ConversationService:
         self.db.add(ai_message)
         await self.db.commit()
         await self.db.refresh(ai_message)
+
+        # Attach quality info for router to use (not stored in DB)
+        ai_message.quality_info = quality
 
         return ai_message
 
@@ -276,7 +445,8 @@ class ConversationService:
         user_id: int,
         user_message: str,
         conversation_history: list[dict],
-        profile: Optional[dict] = None
+        profile: Optional[dict] = None,
+        quality: Optional[ConversationQuality] = None
     ) -> str:
         """
         Call AI service to generate response (사용자별 최적 모델)
@@ -284,7 +454,7 @@ class ConversationService:
         Uses call_ai_for_user to automatically select best AI model
         based on user's country and subscription tier.
         """
-        prompt = create_conversation_prompt(user_message, conversation_history, profile)
+        prompt = create_conversation_prompt(user_message, conversation_history, profile, quality)
 
         try:
             result = await call_ai_for_user(

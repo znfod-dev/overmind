@@ -3,20 +3,23 @@
 from datetime import datetime, date
 from typing import Optional
 import httpx
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from fastapi import HTTPException, status
 
 from app.config import settings
-from app.core.ai_helper import call_ai_for_user
+from app.core.ai_helper import call_ai_for_user, call_ai_service
 from app.core.logging_config import logger
 from app.core.exceptions import NotFoundError, BadRequestError, ServiceError, ErrorCode
 from app.models import DiaryEntry, Conversation, Message, Profile, DiaryLengthType, ConversationStatus
 from app.diary.services.prompts import (
     create_diary_generation_prompt,
     create_mood_analysis_prompt,
-    create_summary_prompt
+    create_summary_prompt,
+    create_diary_review_prompt
 )
+from app.diary.services.conversation import ConversationService
 
 
 class DiaryService:
@@ -79,6 +82,27 @@ class DiaryService:
                 error_code=ErrorCode.CONVERSATION_NO_MESSAGES,
                 message="대화 내용이 없어 일기를 생성할 수 없습니다.",
                 details={"conversation_id": conversation_id}
+            )
+
+        # Validate conversation quality before generating diary
+        conversation_service = ConversationService(self.db)
+        quality = await conversation_service.calculate_conversation_quality(
+            conversation_id=conversation_id,
+            length_type=length_type
+        )
+
+        if not quality.is_sufficient:
+            raise BadRequestError(
+                error_code=ErrorCode.INSUFFICIENT_CONVERSATION,
+                message="대화 내용이 부족하여 일기를 생성할 수 없습니다.",
+                details={
+                    "conversation_id": conversation_id,
+                    "user_message_count": quality.user_message_count,
+                    "required_messages": quality.required_messages,
+                    "total_content_length": quality.total_user_content_length,
+                    "required_length": quality.required_total_length,
+                    "feedback": quality.feedback_message
+                }
             )
 
         # Get profile
@@ -216,7 +240,7 @@ class DiaryService:
         entry_date: datetime,
         profile: dict = None
     ) -> str:
-        """Call AI service to generate diary content (사용자별 최적 모델)"""
+        """Call AI service to generate diary content (Claude 고정 - 창의적 글쓰기에 최적)"""
         prompt = create_diary_generation_prompt(
             conversation_messages=conversation_messages,
             length_type=length_type,
@@ -232,10 +256,11 @@ class DiaryService:
         }
 
         try:
-            result = await call_ai_for_user(
-                user_id=user_id,
+            # 일기 생성은 Claude 사용 (감성적 표현과 창의적 글쓰기에 강점)
+            result = await call_ai_service(
                 prompt=prompt,
-                db=self.db,
+                provider="claude",
+                model=None,  # 기본 Claude 모델 사용
                 max_tokens=max_tokens.get(length_type, 2000),
                 temperature=0.7,
                 timeout=60.0
@@ -265,14 +290,15 @@ class DiaryService:
             )
 
     async def _generate_mood_analysis(self, user_id: int, diary_content: str) -> str:
-        """Generate mood analysis from diary content (사용자별 최적 모델)"""
+        """Generate mood analysis from diary content (Claude 고정 - 감정 분석에 강점)"""
         prompt = create_mood_analysis_prompt(diary_content)
 
         try:
-            result = await call_ai_for_user(
-                user_id=user_id,
+            # 감정 분석도 Claude 사용 (미묘한 감정 뉘앙스 파악에 우수)
+            result = await call_ai_service(
                 prompt=prompt,
-                db=self.db,
+                provider="claude",
+                model=None,
                 max_tokens=50,
                 temperature=0.3,
                 timeout=15.0
@@ -284,14 +310,15 @@ class DiaryService:
             return "중립"  # Default fallback
 
     async def _generate_summary(self, user_id: int, diary_content: str) -> str:
-        """Generate summary from diary content (사용자별 최적 모델)"""
+        """Generate summary from diary content (Claude 고정 - 요약에 강점)"""
         prompt = create_summary_prompt(diary_content)
 
         try:
-            result = await call_ai_for_user(
-                user_id=user_id,
+            # 일기 요약도 Claude 사용 (핵심 내용 추출 및 표현력 우수)
+            result = await call_ai_service(
                 prompt=prompt,
-                db=self.db,
+                provider="claude",
+                model=None,
                 max_tokens=200,
                 temperature=0.5,
                 timeout=15.0
@@ -301,3 +328,131 @@ class DiaryService:
         except Exception as e:
             logger.error(f"Summary generation error: {e}", exc_info=True)
             return None  # Summary is optional
+
+    async def create_manual_diary(
+        self,
+        user_id: int,
+        entry_date: date,
+        title: str,
+        content: str
+    ) -> DiaryEntry:
+        """
+        Create diary entry manually (without conversation)
+
+        Args:
+            user_id: User ID
+            entry_date: Date for this diary entry
+            title: Diary title
+            content: Diary content
+
+        Returns:
+            Created DiaryEntry
+        """
+        # Check if diary already exists for this date
+        existing = await self.get_diary_by_date(entry_date, user_id)
+        if existing:
+            raise BadRequestError(
+                error_code=ErrorCode.DIARY_ALREADY_EXISTS,
+                message=f"{entry_date}에 이미 일기가 존재합니다.",
+                details={"entry_date": entry_date.isoformat()}
+            )
+
+        # Generate mood and summary using AI
+        mood = await self._generate_mood_analysis(user_id, content)
+        summary = await self._generate_summary(user_id, content)
+
+        # Create diary entry
+        diary = DiaryEntry(
+            user_id=user_id,
+            conversation_id=None,  # No conversation for manual entries
+            title=title,
+            content=content,
+            entry_date=entry_date,
+            length_type=DiaryLengthType.normal,  # Default
+            mood=mood,
+            summary=summary
+        )
+
+        self.db.add(diary)
+        await self.db.commit()
+        await self.db.refresh(diary)
+
+        logger.info(f"Manual diary created: id={diary.id}, user_id={user_id}, date={entry_date}")
+        return diary
+
+    async def review_diary(
+        self,
+        user_id: int,
+        title: str,
+        content: str
+    ) -> dict:
+        """
+        Get AI review and suggestions for diary content
+
+        Args:
+            user_id: User ID
+            title: Diary title
+            content: Diary content to review
+
+        Returns:
+            Dict with review feedback, mood, suggestions, and improved content
+        """
+        prompt = create_diary_review_prompt(title, content)
+
+        try:
+            # 일기 검수도 Claude 사용 (세밀한 피드백과 개선 제안에 탁월)
+            result = await call_ai_service(
+                prompt=prompt,
+                provider="claude",
+                model=None,
+                max_tokens=3000,
+                temperature=0.7,
+                timeout=60.0
+            )
+
+            # Parse JSON response
+            review_text = result["text"].strip()
+
+            # Remove markdown code blocks if present
+            if review_text.startswith("```json"):
+                review_text = review_text[7:]
+            if review_text.startswith("```"):
+                review_text = review_text[3:]
+            if review_text.endswith("```"):
+                review_text = review_text[:-3]
+
+            review_data = json.loads(review_text.strip())
+
+            logger.info(f"Diary reviewed for user_id={user_id}")
+            return review_data
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI review JSON: {e}")
+            # Return a fallback response
+            return {
+                "overall_feedback": "일기를 검토했습니다. 전반적으로 잘 작성되었습니다.",
+                "mood": "neutral",
+                "suggestions": [],
+                "improved_content": None
+            }
+        except httpx.TimeoutException:
+            logger.error("Diary review timeout")
+            raise ServiceError(
+                error_code=ErrorCode.AI_SERVICE_TIMEOUT,
+                message="일기 검수 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.",
+                details={}
+            )
+        except httpx.HTTPStatusError as e:
+            logger.error(f"AI service HTTP error: {e.response.status_code}")
+            raise ServiceError(
+                error_code=ErrorCode.AI_SERVICE_ERROR,
+                message="일기 검수 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                details={"status_code": e.response.status_code}
+            )
+        except httpx.RequestError as e:
+            logger.error(f"AI service request error: {str(e)}")
+            raise ServiceError(
+                error_code=ErrorCode.AI_SERVICE_UNAVAILABLE,
+                message="AI 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+                details={}
+            )
