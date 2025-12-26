@@ -42,7 +42,8 @@ async def start_conversation(
         user_id=current_user.id,
         entry_date=request.entry_date,
         timezone=request.timezone,
-        current_time=request.current_time
+        current_time=request.current_time,
+        force_new=request.force_new
     )
 
     # Reload with messages

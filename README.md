@@ -1,330 +1,144 @@
-# Overmind AI Gateway
+# Overmind API
 
-여러 AI 서비스(Claude, Google AI Studio, OpenAI)를 하나의 통합 API로 연결하는 게이트웨이 서버
+> 지능형 일기 작성을 위한 AI 기반 FastAPI 애플리케이션
 
-🌐 **AI 채팅** + **번역 서비스**를 제공하는 통합 플랫폼
+## 📖 개요
 
-## 🎉 배포 완료!
+Overmind API는 사용자가 작성한 일기를 AI가 분석하고 상호작용하여 더 깊은 성찰을 돕는 서비스입니다. FastAPI를 기반으로 구축되었으며, 모듈화된 아키텍처를 통해 확장성과 유지보수성을 극대화했습니다.
 
-**Production URL**: https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app
+## ✨ 주요 기능
 
-## 기능
+- **사용자 인증**: JWT 기반의 안전한 회원가입, 로그인 및 세션 관리 기능을 제공합니다.
+- **일기 관리 (CRUD)**: 사용자는 자신의 일기를 생성, 조회, 수정, 삭제할 수 있습니다.
+- **AI 기반 대화**: 사용자가 작성한 일기 내용을 바탕으로 AI와 대화를 나눌 수 있습니다.
+- **이미지 생성**: 일기 내용에 어울리는 이미지를 AI를 통해 생성하고 저장합니다.
+- **관리자 대시보드**: 사용자 및 AI 설정 관리를 위한 관리자 페이지를 제공합니다.
+- **다국어 번역**: 텍스트 번역 기능을 지원합니다.
 
-### AI 채팅 서비스 (`/ai`)
-- 🤖 다중 AI 제공자 통합 (Claude, Google AI Studio, OpenAI)
-- 🔄 통일된 요청/응답 형식
-- 🌊 스트리밍 응답 지원
-- 📊 요청/응답 로깅
+## 🚀 기술 스택
 
-### 번역 서비스 (`/translate`)
-- 🌐 5개 언어 지원 (한국어, 베트남어, 영어, 중국어, 러시아어)
-- 🔁 양방향 번역 (모든 언어 쌍)
-- 💬 웹 UI 제공 (Google Translate 스타일)
-- 🎯 REST API 제공
-- 🤖 선택 가능한 AI 제공자
+- **백엔드**: FastAPI, Python 3.11+
+- **데이터베이스**: PostgreSQL (Async aio-pika), SQLAlchemy (Async ORM)
+- **데이터베이스 마이그레이션**: Alembic
+- **인증**: JWT (JSON Web Tokens), OAuth2
+- **데이터 유효성 검사**: Pydantic
+- **API 클라이언트**: aiohttp
+- **테스트**: Pytest
+- **컨테이너**: Docker, Docker Compose
 
-### 공통 기능
-- ⚡ FastAPI Sub-Application 아키텍처
-- 🔐 API 키 인증 (X-API-Key 헤더)
-- 🚦 Rate Limiting (분당 10회)
-- ☁️ GCP Cloud Run 배포
+## 🏗️ 아키텍처
 
-## 기술 스택
+이 프로젝트는 기능별로 독립된 **Sub-Application** 구조를 채택하여 높은 모듈성을 가집니다.
 
-- **언어**: Python 3.11+
-- **프레임워크**: FastAPI 0.115.6
-- **비동기 처리**: asyncio, httpx
-- **배포**: GCP Cloud Run
-- **컨테이너**: Docker (멀티 스테이지 빌드)
+- `app/main.py`는 중앙 진입점(Entrypoint) 역할을 하며, 각 기능별 앱을 마운트(Mount)합니다.
+- 각 기능(예: `app/diary`, `app/auth`)은 자체적인 라우터, 서비스, 스키마를 갖춘 독립적인 FastAPI 앱으로 구성되어 있습니다.
+- **계층(Layer) 분리**:
+  - `routers`: HTTP 요청 수신, 데이터 유효성 검사 및 서비스 계층 호출
+  - `services`: 핵심 비즈니스 로직 처리
+  - `models`: SQLAlchemy ORM 모델을 통한 데이터베이스 스키마 정의
+  - `schemas`: Pydantic 모델을 이용한 API 데이터 형태 정의
 
-## 빠른 시작
+### 폴더 구조
 
-### 로컬 개발
+```
+/
+├── alembic/              # 데이터베이스 마이그레이션 스크립트
+├── app/                  # 핵심 애플리케이션 코드
+│   ├── admin/            # 관리자 기능 모듈
+│   ├── auth/             # 인증 기능 모듈
+│   ├── diary/            # 일기 기능 모듈
+│   ├── clients/          # 외부 AI API 클라이언트
+│   ├── core/             # 로깅, 예외 처리 등 공통 로직
+│   ├── database/         # 데이터베이스 설정 및 세션 관리
+│   ├── models/           # SQLAlchemy 데이터베이스 모델
+│   └── ...
+├── scripts/              # 배포, DB 리셋 등 유틸리티 스크립트
+├── tests/                # Pytest 테스트 코드
+├── alembic.ini           # Alembic 설정 파일
+├── docker-compose.yml    # Docker Compose 설정
+├── Dockerfile            # Docker 이미지 빌드 파일
+└── requirements.txt      # Python 의존성 목록
+```
+
+## ⚙️ 설치 및 설정
+
+### 1. 소스 코드 복제
 
 ```bash
-# 1. 저장소 클론
-git clone <repository-url>
+git clone https://your-repository-url.com/overmind.git
 cd overmind
+```
 
-# 2. 가상환경 생성 및 활성화
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+### 2. 가상 환경 생성 및 활성화
 
-# 3. 의존성 설치
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+### 3. 의존성 설치
+
+```bash
 pip install -r requirements.txt
-
-# 4. 환경 변수 설정
-cp .env.example .env
-# .env 파일에 실제 API 키 입력
-
-# 5. Admin 계정 생성 (서버 실행 전)
-python scripts/create_admin.py --email admin@example.com --password yourpassword
-
-# 6. 서버 실행
-python scripts/start.py
 ```
 
-서버 접속:
-- **메인**: http://localhost:8000
-- **회원가입**: http://localhost:8000/auth/signup
-- **로그인**: http://localhost:8000/auth/login
-- **Admin 대시보드**: http://localhost:8000/admin/ (Admin 계정 필요)
-- **AI 채팅 API**: http://localhost:8000/ai/docs
-- **번역 웹 UI**: http://localhost:8000/translate
-- **번역 API**: http://localhost:8000/translate/docs
-- **Health Check**: http://localhost:8000/health
+### 4. 환경 변수 설정
 
-### Docker로 실행
+루트 디렉터리에 `.env` 파일을 생성하고 아래 내용을 참고하여 환경 변수를 설정합니다.
+
+```env
+# .env 예시
+
+# 데이터베이스 설정
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=overmind_db
+
+# JWT 설정
+SECRET_KEY=your_super_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# 외부 API 키
+OPENAI_API_KEY=...
+GOOGLE_API_KEY=...
+CLAUDE_API_KEY=...
+```
+
+## ▶️ 실행 방법
+
+### 1. 데이터베이스 마이그레이션
+
+애플리케이션을 실행하기 전에 데이터베이스 스키마를 최신 상태로 마이그레이션해야 합니다.
 
 ```bash
-# Docker Compose 사용
+alembic upgrade head
+```
+
+### 2. FastAPI 서버 실행
+
+Uvicorn을 사용하여 개발 서버를 실행합니다.
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+`--reload` 플래그는 코드 변경 시 서버를 자동으로 재시작합니다.
+
+### 3. (선택) Docker Compose로 실행
+
+Docker가 설치되어 있다면 다음 명령어로 데이터베이스와 애플리케이션을 한 번에 실행할 수 있습니다.
+
+```bash
 docker-compose up --build
-
-# 또는 Docker 직접 사용
-docker build -t overmind-ai-gateway .
-docker run -p 8000:8080 --env-file .env overmind-ai-gateway
 ```
 
-## API 사용법
+## ✅ 테스트
 
-### 헬스 체크
+프로젝트의 테스트는 Pytest를 사용하여 작성되었습니다. 아래 명령어로 전체 테스트를 실행할 수 있습니다.
 
 ```bash
-curl https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app/health
+pytest
 ```
-
-### AI 채팅 API
-
-**일반 요청** (POST /ai/api/req):
-
-```bash
-curl -X POST "https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app/ai/api/req" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: user19881205qkrwhdgus" \
-  -d '{
-    "provider": "claude",
-    "model": "claude-3-5-sonnet-20241022",
-    "prompt": "Hello!",
-    "max_tokens": 100
-  }'
-```
-
-**스트리밍 요청** (POST /ai/api/req/stream):
-
-```bash
-curl -X POST "https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app/ai/api/req/stream" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: user19881205qkrwhdgus" \
-  -d '{
-    "provider": "openai",
-    "model": "gpt-4o-mini",
-    "prompt": "Tell me a joke",
-    "max_tokens": 100
-  }'
-```
-
-### 번역 API
-
-**웹 UI 접속**:
-```
-https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app/translate
-```
-
-**번역 요청** (POST /translate/api/translate):
-
-```bash
-# 번역 API는 인증 불필요 - 누구나 사용 가능
-curl -X POST "https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app/translate/api/translate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Hello, how are you?",
-    "source_lang": "en",
-    "target_lang": "ko",
-    "provider": "claude"
-  }'
-```
-
-**지원 언어 조회** (GET /translate/api/languages):
-
-```bash
-curl "https://overmind-ai-gateway-wzyyrcmd6a-du.a.run.app/translate/api/languages"
-```
-
-### 지원 제공자
-
-| 제공자 | provider 값 | 기본 모델 |
-|--------|------------|-----------|
-| Claude (Anthropic) | `claude` | claude-3-5-sonnet-20241022 |
-| Google AI Studio | `google_ai` | gemini-2.0-flash-exp |
-| OpenAI | `openai` | gpt-4o-mini |
-
-### 지원 언어 (번역)
-
-| 언어 | 코드 | 원어 표기 |
-|------|------|-----------|
-| 한국어 | `ko` | 한국어 |
-| 베트남어 | `vi` | Tiếng Việt |
-| 영어 | `en` | English |
-| 중국어 | `zh` | 中文 |
-| 러시아어 | `ru` | Русский |
-
-## GCP 배포
-
-### 사전 준비
-
-1. [gcloud CLI](https://cloud.google.com/sdk/docs/install) 설치
-2. GCP 프로젝트 생성
-3. Docker Desktop 실행 (선택사항)
-
-### 배포 방법
-
-```bash
-# 1. scripts/deploy.py에서 PROJECT_ID 수정
-# PROJECT_ID = "your-gcp-project-id"
-
-# 2. .env 파일에 API 키 설정
-cp .env.example .env
-# API 키 입력
-
-# 3. 배포 실행
-python3 scripts/deploy.py
-```
-
-배포 스크립트가 자동으로:
-- ✅ GCP 프로젝트 설정
-- ✅ 필요한 API 활성화
-- ✅ 환경 변수 설정
-- ✅ Cloud Build로 이미지 빌드
-- ✅ Cloud Run에 배포
-
-배포 완료 후 서비스 URL이 출력됩니다.
-
-### 로그 확인
-
-```bash
-gcloud run logs read overmind-ai-gateway --region asia-northeast3
-```
-
-## 프로젝트 구조
-
-```
-overmind/
-├── app/
-│   ├── ai/                   # AI 채팅 Sub-App
-│   │   ├── routers/
-│   │   │   └── chat.py      # 채팅 엔드포인트
-│   │   └── main.py          # AI Sub-App
-│   ├── translation/          # 번역 Sub-App
-│   │   ├── routers/
-│   │   │   ├── api.py       # 번역 API
-│   │   │   └── web.py       # 웹 UI
-│   │   ├── schemas/
-│   │   │   ├── requests.py  # 요청 모델
-│   │   │   └── responses.py # 응답 모델
-│   │   ├── services/
-│   │   │   ├── prompts.py   # 번역 프롬프트
-│   │   │   └── translator.py # 번역 서비스
-│   │   ├── templates/
-│   │   │   └── translate.html # 웹 UI
-│   │   └── main.py          # 번역 Sub-App
-│   ├── clients/              # AI 제공자 클라이언트
-│   │   ├── claude_client.py
-│   │   ├── google_ai_client.py
-│   │   └── openai_client.py
-│   ├── core/                 # 핵심 설정
-│   │   ├── config.py
-│   │   ├── http_client.py
-│   │   └── logging_config.py
-│   ├── middleware/           # 미들웨어
-│   │   ├── rate_limiter.py
-│   │   └── request_logger.py
-│   ├── schemas/              # 공통 스키마
-│   │   ├── requests.py
-│   │   └── responses.py
-│   └── main.py               # Main FastAPI App
-├── scripts/
-│   ├── start.py              # 서버 시작
-│   └── deploy.py             # GCP 배포 자동화
-├── tests/                    # 테스트
-│   ├── test_translation/    # 번역 테스트
-│   ├── test_clients/        # 클라이언트 테스트
-│   └── test_routers/        # 라우터 테스트
-├── docs/                     # 문서
-│   ├── PLAN.md              # 개발 계획서
-│   └── TESTING.md           # 테스트 가이드
-├── Dockerfile                # 컨테이너 이미지
-├── docker-compose.yml        # 로컬 Docker 환경
-├── .env.example             # 환경 변수 템플릿
-└── requirements.txt         # Python 의존성
-```
-
-## 개발 진행 상황
-
-### AI 채팅 서비스
-✅ **Phase 1**: 프로젝트 기본 구조
-✅ **Phase 2**: AI 클라이언트 모듈
-✅ **Phase 3**: 통합 API 엔드포인트
-✅ **Phase 4**: Rate Limiting, 로깅, 스트리밍
-✅ **Phase 5**: GCP Cloud Run 배포
-
-### 번역 서비스
-✅ **Phase 6**: 번역 스키마 및 프롬프트
-✅ **Phase 7**: TranslationService 구현
-✅ **Phase 8**: 번역 API 엔드포인트
-✅ **Phase 9**: 웹 UI 구현
-✅ **Phase 10**: Sub-Application 아키텍처 적용
-✅ **Phase 11**: 테스트 및 문서
-
-자세한 내용은 [PLAN.md](docs/PLAN.md)를 참조하세요.
-
-## Admin 계정 관리
-
-### Admin 계정 생성 (서버 실행 전)
-
-서버를 실행하기 전에 Admin 계정을 미리 생성해야 합니다:
-
-```bash
-# 새 Admin 계정 생성
-python scripts/create_admin.py --email admin@example.com --password yourpassword
-```
-
-### 기존 사용자를 Admin으로 승격
-
-```bash
-# 기존 일반 사용자를 Admin으로 승격
-python scripts/create_admin.py --email user@example.com --promote
-```
-
-### Admin 계정 목록 확인
-
-```bash
-# 모든 Admin 계정 목록 보기
-python scripts/create_admin.py --list
-```
-
-### Admin 기능
-
-- ✅ 전체 사용자 목록 조회 및 관리
-- ✅ 사용자 계정 활성화/비활성화
-- ✅ 사용자 계정 차단/차단 해제
-- ✅ 사용자 역할 변경 (user ↔ admin)
-- ✅ 사용자 프로필 조회 및 수정
-- ✅ 사용자 삭제
-- ✅ 시스템 통계 확인
-
-## 환경 변수
-
-| 변수명 | 설명 | 필수 |
-|--------|------|------|
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) API 키 | ✅ |
-| `GOOGLE_AI_API_KEY` | Google AI Studio API 키 | ✅ |
-| `OPENAI_API_KEY` | OpenAI API 키 | ✅ |
-| `API_AUTH_KEY` | 외부 사용자 인증 키 (X-API-Key 헤더) | ✅ |
-| `INTERNAL_API_KEY` | 내부 서비스 간 통신용 키 | ✅ |
-| `AI_SERVICE_URL` | AI 서비스 URL (기본값: http://localhost:8000) | ❌ |
-| `JWT_SECRET_KEY` | JWT 토큰 암호화 키 | ✅ |
-| `DEBUG` | 디버그 모드 (True/False) | ❌ |
-
-## 라이선스
-
-MIT License

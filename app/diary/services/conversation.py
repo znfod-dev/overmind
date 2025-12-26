@@ -184,23 +184,35 @@ class ConversationService:
         user_id: int,
         entry_date: date,
         timezone: str = "America/Los_Angeles",
-        current_time: Optional[datetime] = None
+        current_time: Optional[datetime] = None,
+        force_new: bool = False
     ) -> tuple[Conversation, Message]:
         """
-        Start a new diary conversation with AI-generated greeting
+        Start a new or retrieve an existing diary conversation.
 
-        Args:
-            user_id: User ID
-            entry_date: Date for this diary entry
-            timezone: User's timezone (IANA format)
-            current_time: Client's current local time (timezone-aware)
-
-        Returns:
-            Tuple of (Conversation, initial Message)
-
-        Raises:
-            BadRequestError: If entry_date is in the future
+        If an active conversation for the given user and date already exists,
+        it will be returned unless `force_new` is True.
         """
+        # Check for existing active conversation
+        existing_conversation = await self.get_active_conversation(user_id, entry_date)
+        if existing_conversation:
+            if force_new:
+                # Complete the existing conversation before creating a new one
+                logger.info(f"Forcing new conversation. Completing existing one {existing_conversation.id}")
+                existing_conversation.status = ConversationStatus.completed
+                existing_conversation.ended_at = datetime.utcnow()
+                await self.db.commit()
+            else:
+                # If not forcing new, return the existing conversation
+                result = await self.db.execute(
+                    select(Message)
+                    .where(Message.conversation_id == existing_conversation.id)
+                    .order_by(Message.created_at.asc())
+                    .limit(1)
+                )
+                first_message = result.scalar_one()
+                return existing_conversation, first_message
+
         # Validate timezone (fallback to America/Los_Angeles if invalid)
         try:
             tz = ZoneInfo(timezone)
@@ -241,7 +253,7 @@ class ConversationService:
                 temperature=0.9,  # More creative
                 timeout=15.0
             )
-            initial_message = result["text"].strip()
+            initial_message_content = result["text"].strip()
         except Exception as e:
             # Fallback to context-aware default if AI fails
             logger.error(f"Failed to generate greeting: {e}", exc_info=True)
@@ -249,15 +261,15 @@ class ConversationService:
             # Generate fallback message based on date
             days_diff = (today - entry_date).days
             if entry_date == today:
-                initial_message = "안녕하세요! 오늘 하루는 어떠셨나요?"
+                initial_message_content = "안녕하세요! 오늘 하루는 어떠셨나요?"
             elif days_diff == 1:
-                initial_message = "안녕하세요! 어제는 어떤 하루를 보내셨나요?"
+                initial_message_content = "안녕하세요! 어제는 어떤 하루를 보내셨나요?"
             elif days_diff == 2:
-                initial_message = "안녕하세요! 그저께는 어떤 일들이 있으셨나요?"
+                initial_message_content = "안녕하세요! 그저께는 어떤 일들이 있으셨나요?"
             elif days_diff <= 7:
-                initial_message = f"안녕하세요! {entry_date.month}월 {entry_date.day}일에는 어떤 하루를 보내셨나요?"
+                initial_message_content = f"안녕하세요! {entry_date.month}월 {entry_date.day}일에는 어떤 하루를 보내셨나요?"
             else:
-                initial_message = f"안녕하세요! {entry_date.month}월 {entry_date.day}일을 기억해보시면, 어떤 일들이 있으셨나요?"
+                initial_message_content = f"안녕하세요! {entry_date.month}월 {entry_date.day}일을 기억해보시면, 어떤 일들이 있으셨나요?"
 
         # Create conversation
         conversation = Conversation(
@@ -273,7 +285,7 @@ class ConversationService:
         message = Message(
             conversation_id=conversation.id,
             role=MessageRole.ai,
-            content=initial_message
+            content=initial_message_content
         )
         self.db.add(message)
         await self.db.commit()

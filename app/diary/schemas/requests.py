@@ -17,13 +17,18 @@ class StartConversationRequest(BaseModel):
         default=None,
         description="Client's current local time (ISO 8601 format with timezone). If not provided, server time will be used."
     )
+    force_new: bool = Field(
+        default=False,
+        description="If true, completes any existing active conversation for this date and starts a new one."
+    )
 
     class Config:
         json_schema_extra = {
             "example": {
                 "entry_date": "2025-12-18",
                 "timezone": "America/Los_Angeles",
-                "current_time": "2025-12-18T09:30:00-08:00"
+                "current_time": "2025-12-18T09:30:00-08:00",
+                "force_new": False
             }
         }
 
