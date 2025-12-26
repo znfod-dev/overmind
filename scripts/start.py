@@ -71,7 +71,14 @@ def start_cloud_sql_proxy():
 
         # 프로세스가 여전히 실행 중인지 확인
         if cloud_sql_proxy_process.poll() is not None:
-            raise Exception("Cloud SQL Proxy failed to start")
+            # 프로세스가 시작 직후 종료된 경우, 에러 메시지 출력
+            stdout, stderr = cloud_sql_proxy_process.communicate()
+            error_message = "Cloud SQL Proxy failed to start.\n"
+            if stdout:
+                error_message += f"--- STDOUT ---\n{stdout}\n"
+            if stderr:
+                error_message += f"--- STDERR ---\n{stderr}\n"
+            raise Exception(error_message)
 
         print("✅ Cloud SQL Proxy is ready")
         return True
@@ -94,15 +101,10 @@ def main():
         signal.signal(signal.SIGINT, cleanup_proxy)
         signal.signal(signal.SIGTERM, cleanup_proxy)
 
-        # Cloud SQL Proxy 시작 (USE_CLOUD_SQL=true인 경우만)
-        use_cloud_sql = os.getenv("USE_CLOUD_SQL", "false").lower() == "true"
-        if use_cloud_sql:
-            if not start_cloud_sql_proxy():
-                print("❌ Failed to start Cloud SQL Proxy. Exiting...")
-                sys.exit(1)
-        else:
-            print("⚠️  Cloud SQL Proxy disabled (USE_CLOUD_SQL=false)")
-            print("   Using local database or direct connection")
+        # Cloud SQL Proxy 시작
+        if not start_cloud_sql_proxy():
+            print("❌ Failed to start Cloud SQL Proxy. Exiting...")
+            sys.exit(1)
 
         print(f"\n🚀 Starting server in LOCAL mode on port {port}")
         print(f"📍 Access: http://localhost:{port}")

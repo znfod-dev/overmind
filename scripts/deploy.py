@@ -16,7 +16,6 @@ SERVICE_NAME = "overmind-ai-gateway"
 # Cloud SQL 설정 (PostgreSQL 사용 시)
 CLOUD_SQL_INSTANCE = "overmind-nana-20251218"  # Cloud SQL 인스턴스 이름
 CLOUD_SQL_CONNECTION = f"{PROJECT_ID}:{REGION}:{CLOUD_SQL_INSTANCE}"  # 자동 생성
-USE_CLOUD_SQL = True  # Cloud SQL 사용 여부 (False면 SQLite 사용)
 
 # 색상 코드
 GREEN = "\033[92m"
@@ -179,18 +178,17 @@ def create_env_yaml(env_vars):
         print_info("INTERNAL_API_KEY 자동 생성")
 
     # Cloud SQL 사용 시, DATABASE_URL 강제 설정
-    if USE_CLOUD_SQL:
-        db_socket_dir = "/cloudsql"
-        db_user = deploy_env_vars.get("DB_USER", "overmind-user")
-        db_pass = deploy_env_vars.get("DB_PASS", "Qkrwhdgus-nana-20251205")
-        db_name = deploy_env_vars.get("DB_NAME", "overmind")
+    db_socket_dir = "/cloudsql"
+    db_user = deploy_env_vars.get("DB_USER", "overmind-user")
+    db_pass = deploy_env_vars.get("DB_PASS", "Qkrwhdgus-nana-20251205")
+    db_name = deploy_env_vars.get("DB_NAME", "overmind")
 
-        cloud_sql_db_url = (
-            f"postgresql+asyncpg://{db_user}:{db_pass}@/{db_name}"
-            f"?host={db_socket_dir}/{CLOUD_SQL_CONNECTION}"
-        )
-        deploy_env_vars["DATABASE_URL"] = cloud_sql_db_url
-        print_info(f"Cloud SQL DATABASE_URL 설정: {cloud_sql_db_url}")
+    cloud_sql_db_url = (
+        f"postgresql+asyncpg://{db_user}:{db_pass}@/{db_name}"
+        f"?host={db_socket_dir}/{CLOUD_SQL_CONNECTION}"
+    )
+    deploy_env_vars["DATABASE_URL"] = cloud_sql_db_url
+    print_info(f"Cloud SQL DATABASE_URL 설정: {cloud_sql_db_url}")
 
 
     with open(env_yaml_path, "w") as f:
@@ -210,10 +208,8 @@ def deploy():
     print_info("이 작업은 5-10분 소요될 수 있습니다...")
 
     # Cloud SQL 연결 설정
-    cloudsql_flag = ""
-    if USE_CLOUD_SQL:
-        cloudsql_flag = f"--add-cloudsql-instances={CLOUD_SQL_CONNECTION}"
-        print_info(f"Cloud SQL 연결: {CLOUD_SQL_CONNECTION}")
+    cloudsql_flag = f"--add-cloudsql-instances={CLOUD_SQL_CONNECTION}"
+    print_info(f"Cloud SQL 연결: {CLOUD_SQL_CONNECTION}")
 
     # --source 방식: gcloud가 자동으로 빌드
     deploy_cmd = f"""gcloud run deploy {SERVICE_NAME} \\

@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 10080  # 7 days (for development)
 
     # Database Configuration
-    database_url: str = "sqlite+aiosqlite:///./data/overmind.db"  # Default to SQLite
+    database_url: str = "postgresql+asyncpg://user:password@localhost:5432/database" # Cloud SQL Proxy를 통한 PostgreSQL 연결 기본값
     cloud_sql_connection_name: str | None = None
     database_echo: bool = False  # Set to True for SQL logging
 
